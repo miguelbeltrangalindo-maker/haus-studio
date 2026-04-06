@@ -6,33 +6,40 @@ import SessionModal from '../components/SessionModal'
 import { useConfig } from '../hooks/useConfig'
 
 const QUICK = [
-  { label: 'Todas', key: '' },
-  { label: 'Hoy', key: 'hoy' },
-  { label: 'Mañana', key: 'mañana' },
-  { label: 'Pendientes entrega', key: 'pendiente' },
-  { label: 'Entregadas', key: 'entregada' },
-  { label: 'Canceladas', key: 'cancelada' },
+  { label: 'Todas',              key: '' },
+  { label: 'Hoy',                key: 'hoy' },
+  { label: 'Mañana',             key: 'manana' },
+  { label: 'En sesión',          key: 'en-sesion' },
+  { label: 'Pend. de entrega',   key: 'pendiente' },
+  { label: 'Pend. de pago',      key: 'pago' },
+  { label: 'Entregadas',         key: 'entregada' },
+  { label: 'Canceladas',         key: 'cancelada' },
 ]
 
-export default function Sesiones({ sessions, loading, createSession, updateSession, deleteSession }) {
+export default function Sesiones({ sessions, loading, createSession, updateSession }) {
   const toast = useToast()
   const { config } = useConfig()
   const [search, setSearch] = useState('')
-  const [quick, setQuick] = useState('')
-  const [modal, setModal] = useState(null)
+  const [quick,  setQuick]  = useState('')
+  const [modal,  setModal]  = useState(null)
 
   const filtered = useMemo(() => {
     let list = [...sessions]
-    if (search) list = list.filter(s =>
-      s.nombre?.toLowerCase().includes(search.toLowerCase()) ||
-      s.telefono?.includes(search)
-    )
-    if (quick === 'hoy') list = list.filter(s => s.fecha === todayStr())
-    if (quick === 'mañana') list = list.filter(s => s.fecha === tomorrowStr())
+    if (search) {
+      const q = search.toLowerCase()
+      list = list.filter(s =>
+        s.nombre?.toLowerCase().includes(q) ||
+        s.telefono?.includes(search)
+      )
+    }
+    if (quick === 'hoy')       list = list.filter(s => s.fecha === todayStr())
+    if (quick === 'manana')    list = list.filter(s => s.fecha === tomorrowStr())
+    if (quick === 'en-sesion') list = list.filter(s => s.estatus === 'En sesión')
     if (quick === 'pendiente') list = list.filter(s => s.estatus === 'Pendiente de entrega')
+    if (quick === 'pago')      list = list.filter(s => s.estatus === 'Pendiente de pago')
     if (quick === 'entregada') list = list.filter(s => s.estatus === 'Entregada')
     if (quick === 'cancelada') list = list.filter(s => s.estatus === 'Cancelada')
-    return list.sort((a, b) => (a.fecha + a.hora) < (b.fecha + b.hora) ? 1 : -1)
+    return list.sort((a, b) => (a.fecha + (a.hora || '')) < (b.fecha + (b.hora || '')) ? 1 : -1)
   }, [sessions, search, quick])
 
   const handleSave = async (form) => {
@@ -57,11 +64,16 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
     const phone = '52' + s.telefono.replace(/\D/g, '').replace(/^52/, '')
     let msg = ''
     if (type === 'reminder') {
-      msg = (config.reminder_message || '').replace(/{nombre}/g, s.nombre).replace(/{fecha}/g, fmtDate(s.fecha)).replace(/{hora}/g, s.hora?.slice(0, 5))
+      msg = (config.reminder_message || '')
+        .replace(/{nombre}/g, s.nombre)
+        .replace(/{fecha}/g, fmtDate(s.fecha))
+        .replace(/{hora}/g, s.hora?.slice(0, 5) || s.hora)
       updateSession(s.id, { reminder_sent: true })
     } else {
       if (!s.link) { toast('Sin vínculo de fotos', 'error'); return }
-      msg = (config.delivery_message || '').replace(/{nombre}/g, s.nombre).replace(/{link}/g, s.link)
+      msg = (config.delivery_message || '')
+        .replace(/{nombre}/g, s.nombre)
+        .replace(/{link}/g, s.link)
       updateSession(s.id, { link_sent: true })
     }
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank')
@@ -77,7 +89,7 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
       </div>
 
       <div className="page-content">
-        {/* Buscador */}
+        {/* Búsqueda */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
           <input
             className="input"
@@ -96,17 +108,21 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
         {/* Filtros rápidos */}
         <div className="filter-pills">
           {QUICK.map(q => (
-            <div
+            <button
               key={q.key}
               className={`pill ${quick === q.key ? 'active' : ''}`}
               onClick={() => setQuick(q.key)}
             >
               {q.label}
-            </div>
+            </button>
           ))}
         </div>
 
-        {/* Lista de sesiones */}
+        {/* Resultado */}
+        <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12 }}>
+          {!loading && `${filtered.length} sesión${filtered.length !== 1 ? 'es' : ''}`}
+        </div>
+
         <div className="card" style={{ padding: 0 }}>
           {loading ? (
             <div className="loading">Cargando sesiones…</div>
@@ -116,7 +132,6 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
             <div className="session-list">
               {filtered.map(s => (
                 <div key={s.id} className="session-card" onClick={() => setModal({ session: s })}>
-                  {/* Izquierda: avatar + info */}
                   <div className="session-card-left">
                     <div className="avatar">{initials(s.nombre)}</div>
                     <div className="session-card-info">
@@ -130,28 +145,31 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
                       {((+s.anticipo > 0) || (+s.restante > 0)) && (
                         <div className="session-card-money">
                           {+s.anticipo > 0 && (
-                            <span style={{ color: 'var(--green2)' }}>Anticipo ${(+s.anticipo).toLocaleString()}</span>
+                            <span style={{ color: 'var(--c-completada)' }}>
+                              ${(+s.anticipo).toLocaleString()} ant.
+                            </span>
                           )}
                           {+s.restante > 0 && (
-                            <span style={{ color: 'var(--amber2)' }}>Restante ${(+s.restante).toLocaleString()}</span>
+                            <span style={{ color: 'var(--c-pago)' }}>
+                              ${(+s.restante).toLocaleString()} saldo
+                            </span>
                           )}
                         </div>
                       )}
                     </div>
                   </div>
 
-                  {/* Derecha: acciones WhatsApp */}
                   <div className="session-card-actions" onClick={e => e.stopPropagation()}>
                     <button
-                      className="btn btn-wa btn-sm btn-icon"
-                      title="Enviar recordatorio"
+                      className="btn btn-wa btn-xs btn-icon"
+                      title="Recordatorio WhatsApp"
                       onClick={e => openWA(s, 'reminder', e)}
                     >
                       📱
                     </button>
                     {s.link && (
                       <button
-                        className="btn btn-wa btn-sm btn-icon"
+                        className="btn btn-wa btn-xs btn-icon"
                         title="Enviar fotos"
                         onClick={e => openWA(s, 'delivery', e)}
                       >
