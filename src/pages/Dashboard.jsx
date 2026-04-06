@@ -43,10 +43,12 @@ export default function Dashboard({ sessions, loading, createSession, updateSess
   const entregadas    = rangeSessions.filter(s => s.estatus === 'Entregada')
   const canceladas    = rangeSessions.filter(s => ['Cancelada', 'No show'].includes(s.estatus))
   // Liquidadas: completed/delivered sessions with no pending balance
-  const liquidadas    = rangeActive.filter(s =>
+  const liquidadas     = rangeActive.filter(s =>
     ['Completada', 'Entregada', 'Pendiente de entrega'].includes(s.estatus) &&
     (+s.restante === 0 || s.restante === '' || s.restante == null)
   )
+  // Total balance collected via handleCobrar (excludes anticipos)
+  const totalLiquidado = liquidadas.reduce((a, s) => a + (+s.pagos || 0), 0)
 
   const totalAnticipo = rangeActive.reduce((a, s) => a + (+s.anticipo || 0), 0)
   const totalRestante = rangeActive.reduce((a, s) => a + (+s.restante || 0), 0)
@@ -192,9 +194,11 @@ export default function Dashboard({ sessions, loading, createSession, updateSess
           </KpiIcon>
           <div>
             <div className="dash-kpi-value" style={{ color: liquidadas.length > 0 ? 'var(--green-l)' : undefined }}>
-              {liquidadas.length}
+              {totalLiquidado > 0 ? `$${totalLiquidado.toLocaleString()}` : liquidadas.length}
             </div>
-            <div className="dash-kpi-label">Liquidadas</div>
+            <div className="dash-kpi-label">
+              Liquidadas{liquidadas.length > 0 && totalLiquidado > 0 ? ` · ${liquidadas.length}` : ''}
+            </div>
           </div>
         </div>
 

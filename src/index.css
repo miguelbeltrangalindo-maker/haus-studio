@@ -940,21 +940,20 @@ select.form-input { background-image: url("data:image/svg+xml,%3Csvg xmlns='http
 .gap-4 { gap: 4px; }
 .sent-check { font-size: 12px; color: var(--green-l); font-weight: 500; }
 
-/* ─── Portrait lock (mobile landscape blocked) ───────────────── */
-.rotate-overlay { display: none; }
-
+/* ─── Portrait lock — CSS only, no overlay ───────────────────── */
+/* On mobile, if rotated to landscape the layout stays portrait.  */
+/* The PWA manifest (orientation: portrait-primary) handles it    */
+/* when installed; this CSS keeps it steady in browser too.       */
 @media (max-width: 1024px) and (orientation: landscape) {
-  .app { display: none !important; }
-  .rotate-overlay {
-    display: flex;
+  html {
+    transform: rotate(-90deg);
+    transform-origin: left top;
+    width: 100svh;
+    height: 100svw;
     position: fixed;
-    inset: 0;
-    z-index: 9999;
-    background: var(--bg);
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 20px;
+    top: 100%;
+    left: 0;
+    overflow: hidden;
   }
 }
 

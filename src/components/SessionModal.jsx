@@ -25,6 +25,7 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
     anticipo: '',
     restante: '',
     metodo_pago: '',
+    pagos: 0,
     notas: '',
     link: '',
     seguimiento: '',
@@ -64,6 +65,7 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
       ...form,
       restante:    String(newRestante),
       metodo_pago: payMethod,
+      pagos:       (+form.pagos || 0) + amount, // accumulate balance collected
       // If now fully paid and was in "Pendiente de pago", advance to Completada
       estatus: (newRestante === 0 && form.estatus === 'Pendiente de pago') ? 'Completada' : form.estatus,
     }
