@@ -431,14 +431,25 @@ tbody tr:last-child td { border-bottom: none; }
   outline: none;
   transition: border-color .15s, box-shadow .15s;
   width: 100%;
+  /* Normalize date/time inputs across browsers */
+  -webkit-appearance: none;
+  appearance: none;
 }
 .input:focus, .form-input:focus {
   border-color: var(--violet);
   box-shadow: var(--violet-glow);
 }
 .input::placeholder, .form-input::placeholder { color: var(--text3); }
-select.input, select.form-input { cursor: pointer; }
+select.input, select.form-input { cursor: pointer; -webkit-appearance: none; }
 textarea.form-input { resize: vertical; min-height: 84px; line-height: 1.6; }
+/* iOS Safari: left-align the date/time text value */
+input[type="date"]::-webkit-date-and-time-value,
+input[type="time"]::-webkit-date-and-time-value {
+  text-align: left;
+  min-height: 1.4em;
+}
+/* Keep selects visible */
+select.form-input { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2356566A' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; }
 
 .form-group { display: flex; flex-direction: column; gap: 7px; }
 .form-grid  { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -928,6 +939,24 @@ textarea.form-input { resize: vertical; min-height: 84px; line-height: 1.6; }
 .gap-8 { gap: 8px; }
 .gap-4 { gap: 4px; }
 .sent-check { font-size: 12px; color: var(--green-l); font-weight: 500; }
+
+/* ─── Portrait lock (mobile landscape blocked) ───────────────── */
+.rotate-overlay { display: none; }
+
+@media (max-width: 1024px) and (orientation: landscape) {
+  .app { display: none !important; }
+  .rotate-overlay {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: var(--bg);
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+  }
+}
 
 /* ─── Responsive ─────────────────────────────────────────────── */
 @media (max-width: 768px) {

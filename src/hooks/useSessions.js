@@ -18,6 +18,17 @@ export function useSessions() {
 
   useEffect(() => { fetch() }, [fetch])
 
+  // Columns added after initial deploy — require ALTER TABLE in Supabase.
+  // If the DB doesn't have them yet, we strip & retry so the app doesn't crash.
+  const OPTIONAL_COLS = ['metodo_pago']
+  const stripOptional = (obj) => {
+    const out = { ...obj }
+    OPTIONAL_COLS.forEach(c => delete out[c])
+    return out
+  }
+  const isSchemaError = (msg = '') =>
+    msg.includes('schema cache') || msg.includes('column') || msg.includes('does not exist')
+
   const createSession = async (data) => {
     // Check conflict
     const { data: conflict } = await supabase
@@ -29,11 +40,11 @@ export function useSessions() {
       .maybeSingle()
     if (conflict) return { error: `Ese horario ya está reservado para ${conflict.nombre}` }
 
-    const { data: row, error } = await supabase
-      .from('sessions')
-      .insert([{ ...data, created_at: new Date().toISOString() }])
-      .select()
-      .single()
+    let payload = { ...data, created_at: new Date().toISOString() }
+    let { data: row, error } = await supabase.from('sessions').insert([payload]).select().single()
+    if (error && isSchemaError(error.message)) {
+      ;({ data: row, error } = await supabase.from('sessions').insert([stripOptional(payload)]).select().single())
+    }
     if (error) return { error: error.message }
     setSessions(prev => [row, ...prev])
     return { data: row }
@@ -44,7 +55,7 @@ export function useSessions() {
     if (updates.fecha || updates.hora) {
       const current = sessions.find(s => s.id === id)
       const checkFecha = updates.fecha || current?.fecha
-      const checkHora = updates.hora || current?.hora
+      const checkHora  = updates.hora  || current?.hora
       const { data: conflict } = await supabase
         .from('sessions')
         .select('id, nombre')
@@ -56,12 +67,10 @@ export function useSessions() {
       if (conflict) return { error: `Ese horario ya está reservado para ${conflict.nombre}` }
     }
 
-    const { data: row, error } = await supabase
-      .from('sessions')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single()
+    let { data: row, error } = await supabase.from('sessions').update(updates).eq('id', id).select().single()
+    if (error && isSchemaError(error.message)) {
+      ;({ data: row, error } = await supabase.from('sessions').update(stripOptional(updates)).eq('id', id).select().single())
+    }
     if (error) return { error: error.message }
     setSessions(prev => prev.map(s => s.id === id ? row : s))
     return { data: row }
