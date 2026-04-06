@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useState, useEffect } from 'react'
 import { format, addDays, startOfWeek, addWeeks, subWeeks, addMonths, subMonths, getDaysInMonth, startOfMonth, getDay } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { getTimeSlots, statusClass, statusColor, weekDays, fmtDate, todayStr } from '../lib/utils'
@@ -15,6 +15,13 @@ export default function Agenda({ sessions, createSession, updateSession }) {
 
   const slots = getTimeSlots(config.open_time, config.close_time, config.block_minutes)
   const todayS = todayStr()
+
+  // On mobile, week view doesn't fit — fall back to day
+  useEffect(() => {
+    if (view === 'week' && window.matchMedia('(max-width: 768px)').matches) {
+      setView('day')
+    }
+  }, [])
 
   const nav = (dir) => {
     if (view === 'day') setCurrent(d => addDays(d, dir))
@@ -113,8 +120,8 @@ export default function Agenda({ sessions, createSession, updateSession }) {
     const mon = startOfWeek(current, { weekStartsOn: 1 })
     const days = Array.from({ length: 7 }, (_, i) => addDays(mon, i))
     return (
-      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-        <div className="week-grid" style={{ minWidth: 580 }}>
+      <div className="week-scroll">
+        <div className="week-grid">
           {/* Header vacío para columna de hora */}
           <div className="day-header" style={{ borderRight: '1px solid var(--border)' }} />
           {days.map((d, i) => {
@@ -220,8 +227,8 @@ export default function Agenda({ sessions, createSession, updateSession }) {
         {/* Controles de navegación */}
         <div className="agenda-controls">
           <div className="view-tabs">
-            {[['day', 'Día'], ['week', 'Semana'], ['month', 'Mes']].map(([v, label]) => (
-              <button key={v} className={`view-tab ${view === v ? 'active' : ''}`} onClick={() => setView(v)}>
+            {[['day', 'Día', ''], ['week', 'Semana', 'view-tab-week'], ['month', 'Mes', '']].map(([v, label, extra]) => (
+              <button key={v} className={`view-tab ${view === v ? 'active' : ''} ${extra}`} onClick={() => setView(v)}>
                 {label}
               </button>
             ))}
