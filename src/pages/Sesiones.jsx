@@ -145,12 +145,12 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
                       {((+s.anticipo > 0) || (+s.restante > 0)) && (
                         <div className="session-card-money">
                           {+s.anticipo > 0 && (
-                            <span style={{ color: 'var(--c-completada)' }}>
+                            <span style={{ color: 'var(--green)' }}>
                               ${(+s.anticipo).toLocaleString()} ant.
                             </span>
                           )}
                           {+s.restante > 0 && (
-                            <span style={{ color: 'var(--c-pago)' }}>
+                            <span style={{ color: 'var(--amber)' }}>
                               ${(+s.restante).toLocaleString()} saldo
                             </span>
                           )}

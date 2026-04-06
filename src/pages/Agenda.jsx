@@ -59,35 +59,43 @@ export default function Agenda({ sessions, createSession, updateSession }) {
     setModal(null)
   }
 
-  // ── Day view ──
+  // ── Day view (timeline) ──
   const DayView = () => {
     const dateStr = format(current, 'yyyy-MM-dd')
-    const hasSessions = sessions.some(s => s.fecha === dateStr && s.estatus !== 'Cancelada')
+    const isToday = dateStr === todayS
+
+    // Current time marker
+    const nowMinutes = isToday ? new Date().getHours() * 60 + new Date().getMinutes() : null
+    const [openH, openM] = (config.open_time || '09:00').split(':').map(Number)
+    const openMinutes = openH * 60 + openM
 
     return (
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        {!hasSessions && (
-          <div style={{ padding: '16px 20px 8px', borderBottom: '1px solid var(--border)' }}>
-            <div style={{ fontSize: 13, color: 'var(--text2)' }}>Sin sesiones este día — toca cualquier horario para agregar una</div>
-          </div>
-        )}
+      <div className="timeline">
         {slots.map(slot => {
+          const [h, m] = slot.split(':').map(Number)
+          const slotMinutes = h * 60 + m
+          const isHourStart = m === 0
           const slotSessions = getSessionsAt(dateStr, slot)
+          const showNow = nowMinutes !== null &&
+            nowMinutes >= slotMinutes &&
+            nowMinutes < slotMinutes + (config.block_minutes || 30)
+
           return (
-            <div key={slot} className="day-slot">
-              <div className="day-time">{slot}</div>
+            <div key={slot} className={`timeline-slot${isHourStart ? ' hour-start' : ''}`}>
+              <div className="timeline-time">{slot}</div>
               <div
-                className="day-content"
+                className="timeline-body"
                 onClick={() => slotSessions.length === 0 && openNew(dateStr, slot)}
               >
+                {showNow && <div className="timeline-now" />}
                 {slotSessions.map(ses => (
                   <div
                     key={ses.id}
-                    className={`session-block ${statusClass(ses.estatus)}`}
+                    className={`timeline-session ${statusClass(ses.estatus)}`}
                     onClick={e => { e.stopPropagation(); openEdit(ses) }}
                   >
-                    <div className="session-block-name">{ses.nombre}</div>
-                    <div className="session-block-meta">
+                    <div className="timeline-session-name">{ses.nombre}</div>
+                    <div className="timeline-session-meta">
                       {ses.personas} {ses.personas === 1 ? 'persona' : 'personas'} · {ses.estatus}
                     </div>
                   </div>

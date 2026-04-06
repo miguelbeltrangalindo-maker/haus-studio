@@ -65,7 +65,7 @@ export default function Sidebar() {
       </nav>
 
       <div className="sidebar-bottom">
-        <div style={{ fontSize: 11, color: 'var(--text3)', padding: '2px 14px' }}>HAUS Studio v1.1</div>
+        <div style={{ fontSize: 11, color: 'var(--text3)', padding: '2px 14px' }}>HAUS Studio v1.2</div>
       </div>
     </aside>
   )

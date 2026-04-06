@@ -87,13 +87,13 @@ export default function Hoy({ sessions, loading, createSession, updateSession })
         {todaySessions.length > 0 && (
           <div className="hoy-summary">
             <div className="hoy-summary-item">
-              <span className="hoy-summary-value" style={{ color: 'var(--c-confirmada)' }}>
+              <span className="hoy-summary-value" style={{ color: 'var(--violet-l)' }}>
                 {todaySessions.length}
               </span>
               <span className="hoy-summary-label">sesiones</span>
             </div>
             <div className="hoy-summary-item">
-              <span className="hoy-summary-value" style={{ color: 'var(--c-completada)' }}>
+              <span className="hoy-summary-value" style={{ color: 'var(--green)' }}>
                 {completadas}
               </span>
               <span className="hoy-summary-label">completadas</span>
@@ -106,7 +106,7 @@ export default function Hoy({ sessions, loading, createSession, updateSession })
             </div>
             {cobrado > 0 && (
               <div className="hoy-summary-item">
-                <span className="hoy-summary-value" style={{ color: 'var(--c-completada)' }}>
+                <span className="hoy-summary-value" style={{ color: 'var(--green)' }}>
                   ${cobrado.toLocaleString()}
                 </span>
                 <span className="hoy-summary-label">cobrados</span>
@@ -114,7 +114,7 @@ export default function Hoy({ sessions, loading, createSession, updateSession })
             )}
             {porCobrar > 0 && (
               <div className="hoy-summary-item">
-                <span className="hoy-summary-value" style={{ color: 'var(--c-pago)' }}>
+                <span className="hoy-summary-value" style={{ color: 'var(--amber)' }}>
                   ${porCobrar.toLocaleString()}
                 </span>
                 <span className="hoy-summary-label">por cobrar</span>
@@ -130,7 +130,7 @@ export default function Hoy({ sessions, loading, createSession, updateSession })
           <div className="loading">Cargando…</div>
         ) : todaySessions.length === 0 ? (
           <div className="hoy-empty">
-            <div className="hoy-empty-icon">◯</div>
+            <div className="hoy-empty-glyph">◯</div>
             <div className="hoy-empty-title">Sin sesiones para hoy</div>
             <div className="hoy-empty-sub">La agenda está libre</div>
             <button className="btn btn-primary" onClick={() => setModal({ prefillDate: today })}>
@@ -154,7 +154,7 @@ export default function Hoy({ sessions, loading, createSession, updateSession })
                     {' · '}{s.personas} {s.personas === 1 ? 'persona' : 'personas'}
                     {+s.anticipo > 0 && ` · $${(+s.anticipo).toLocaleString()} anticipo`}
                     {+s.restante > 0 && (
-                      <span style={{ color: 'var(--c-pago)' }}>
+                      <span style={{ color: 'var(--amber)' }}>
                         {` · $${(+s.restante).toLocaleString()} saldo`}
                       </span>
                     )}
@@ -178,7 +178,7 @@ export default function Hoy({ sessions, loading, createSession, updateSession })
                     {['Reservada', 'Confirmada', 'Llegó'].includes(s.estatus) && (
                       <button
                         className={`btn btn-wa btn-sm ${s.reminder_sent ? 'btn-ghost' : ''}`}
-                        style={s.reminder_sent ? { color: 'var(--c-entregada)' } : {}}
+                        style={s.reminder_sent ? { color: 'var(--green-l)' } : {}}
                         onClick={e => openWA(s, 'reminder', e)}
                         title={s.reminder_sent ? 'Recordatorio ya enviado' : 'Enviar recordatorio'}
                       >
@@ -190,7 +190,7 @@ export default function Hoy({ sessions, loading, createSession, updateSession })
                     {s.link && ['Completada', 'Pendiente de entrega'].includes(s.estatus) && (
                       <button
                         className={`btn btn-wa btn-sm ${s.link_sent ? 'btn-ghost' : ''}`}
-                        style={s.link_sent ? { color: 'var(--c-entregada)' } : {}}
+                        style={s.link_sent ? { color: 'var(--green-l)' } : {}}
                         onClick={e => openWA(s, 'delivery', e)}
                         title={s.link_sent ? 'Fotos ya enviadas' : 'Enviar fotos'}
                       >

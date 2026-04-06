@@ -41,6 +41,7 @@ export const ALL_STATUSES = [
   'Entregada',
   'Cancelada',
   'Pendiente de pago',
+  'No show',
 ]
 
 export const statusClass = (s) => {
@@ -54,23 +55,25 @@ export const statusClass = (s) => {
     'Entregada':            'entregada',
     'Cancelada':            'cancelada',
     'Pendiente de pago':    'pendiente-pago',
+    'No show':              'no-show',
   }
   return map[s] || 'reservada'
 }
 
 export const statusColor = (s) => {
   const map = {
-    'Reservada':            '#9b87f5',
-    'Confirmada':           '#60a5fa',
-    'Llegó':                '#22d3ee',
-    'En sesión':            '#fbbf24',
-    'Completada':           '#34d399',
-    'Pendiente de entrega': '#fb923c',
-    'Entregada':            '#6ee7b7',
-    'Cancelada':            '#f87171',
-    'Pendiente de pago':    '#f59e0b',
+    'Reservada':            '#F59E0B',
+    'Confirmada':           '#8B5CF6',
+    'Llegó':                '#A78BFA',
+    'En sesión':            '#A78BFA',
+    'Completada':           '#22C55E',
+    'Pendiente de entrega': '#F59E0B',
+    'Entregada':            '#4ADE80',
+    'Cancelada':            '#EF4444',
+    'Pendiente de pago':    '#F59E0B',
+    'No show':              '#6B7280',
   }
-  return map[s] || '#888'
+  return map[s] || '#6B7280'
 }
 
 // Siguiente estado natural en el flujo de operación
