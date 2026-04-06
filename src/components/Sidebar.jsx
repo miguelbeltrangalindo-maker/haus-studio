@@ -50,7 +50,7 @@ export default function Sidebar() {
         <NavLink to="/" end className={navLink}>
           <IconGrid /><span>Dashboard</span>
         </NavLink>
-        <NavLink to="/hoy" className={navLink}>
+        <NavLink to="/hoy" className={({ isActive }) => `nav-item nav-item-hoy ${isActive ? 'active' : ''}`}>
           <IconToday /><span>Hoy</span>
         </NavLink>
         <NavLink to="/agenda" className={navLink}>

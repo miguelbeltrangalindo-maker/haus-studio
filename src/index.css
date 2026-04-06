@@ -870,9 +870,10 @@ textarea.form-input { resize: vertical; min-height: 84px; line-height: 1.6; }
 
   :root { --sidebar-w: 0px; }
 
-  /* ── Bottom tab bar ── */
+  /* ── Bottom tab bar (safe-area aware) ── */
   .sidebar {
-    width: 100%; height: 68px;
+    width: 100%;
+    height: calc(62px + env(safe-area-inset-bottom));
     inset: auto 0 0 0;
     flex-direction: row;
     border-right: none;
@@ -881,12 +882,21 @@ textarea.form-input { resize: vertical; min-height: 84px; line-height: 1.6; }
     background: rgba(20,20,26,.96);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
+    align-items: flex-start;
+    padding-bottom: env(safe-area-inset-bottom);
   }
   .logo { display: none; }
-  .nav { flex-direction: row; padding: 6px 4px; overflow: visible; gap: 0; }
+  /* Remove Hoy tab — give remaining 4 tabs more space */
+  .nav-item-hoy { display: none !important; }
+  .nav {
+    flex-direction: row;
+    padding: 6px 20px; /* breathing room from edges */
+    overflow: visible;
+    gap: 0;
+  }
   .nav-item {
     flex-direction: column; gap: 3px;
-    padding: 6px 4px; border-radius: 10px;
+    padding: 6px 8px; border-radius: 10px;
     font-size: 10px; letter-spacing: .01em;
     flex: 1; justify-content: center; align-items: center;
     border-left: none !important;
@@ -894,18 +904,26 @@ textarea.form-input { resize: vertical; min-height: 84px; line-height: 1.6; }
     min-width: 0; overflow: hidden;
   }
   .nav-item.active { background: none; border-bottom-color: var(--violet); color: var(--violet-l); }
-  .nav-item span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 54px; text-align: center; }
+  .nav-item span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60px; text-align: center; }
   .nav-icon { width: 20px; height: 20px; opacity: .55; flex-shrink: 0; }
   .nav-item.active .nav-icon { opacity: 1; }
   .sidebar-bottom { display: none; }
 
-  /* ── Main layout ── */
-  .main { margin-left: 0; margin-bottom: 68px; overflow-x: hidden; max-width: 100vw; }
+  /* ── Main layout (safe-area aware) ── */
+  .main {
+    margin-left: 0;
+    margin-bottom: calc(62px + env(safe-area-inset-bottom));
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
   .page-content { padding: 18px 16px; }
 
-  /* ── Topbar ── */
+  /* ── Topbar (safe-area aware — avoids status bar) ── */
   .topbar {
-    padding: 0 16px; height: 52px;
+    padding: env(safe-area-inset-top) 16px 0;
+    height: calc(52px + env(safe-area-inset-top));
+    align-items: flex-end;
+    padding-bottom: 10px;
     position: sticky; top: 0;
   }
   .topbar-date { display: none; }
