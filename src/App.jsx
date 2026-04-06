@@ -1,22 +1,39 @@
-import { Routes, Route } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Routes, Route, useLocation } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import Dashboard from './pages/Dashboard'
 import Hoy from './pages/Hoy'
 import Agenda from './pages/Agenda'
 import Sesiones from './pages/Sesiones'
 import Config from './pages/Config'
+import SessionDetails from './components/SessionDetails'
 import { ToastProvider } from './hooks/useToast'
 import { ConfigProvider } from './hooks/useConfig'
 import { useSessions } from './hooks/useSessions'
 
 function AppInner() {
   const { sessions, loading, createSession, updateSession, deleteSession, fetch } = useSessions()
-  const shared = { sessions, loading, createSession, updateSession, deleteSession, fetch }
+  const [selectedId, setSelectedId] = useState(null)
+  const location = useLocation()
+
+  useEffect(() => { setSelectedId(null) }, [location.pathname])
+
+  const currentSelected = selectedId ? (sessions.find(s => s.id === selectedId) || null) : null
+
+  const onSelectSession = (ses) => {
+    if (!ses) { setSelectedId(null); return }
+    // Desktop only — mobile uses the modal flow in each page
+    if (window.matchMedia('(min-width: 769px)').matches) {
+      setSelectedId(ses.id)
+    }
+  }
+
+  const shared = { sessions, loading, createSession, updateSession, deleteSession, fetch, onSelectSession }
 
   return (
     <div className="app">
       <Sidebar />
-      <main className="main">
+      <main className={`main${currentSelected ? ' panel-open' : ''}`}>
         <Routes>
           <Route path="/"         element={<Dashboard {...shared} />} />
           <Route path="/hoy"      element={<Hoy       {...shared} />} />
@@ -25,6 +42,13 @@ function AppInner() {
           <Route path="/config"   element={<Config />} />
         </Routes>
       </main>
+      {currentSelected && (
+        <SessionDetails
+          session={currentSelected}
+          onClose={() => setSelectedId(null)}
+          updateSession={updateSession}
+        />
+      )}
     </div>
   )
 }

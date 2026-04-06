@@ -16,7 +16,7 @@ const QUICK = [
   { label: 'Canceladas',         key: 'cancelada' },
 ]
 
-export default function Sesiones({ sessions, loading, createSession, updateSession }) {
+export default function Sesiones({ sessions, loading, createSession, updateSession, onSelectSession }) {
   const toast = useToast()
   const { config } = useConfig()
   const [search, setSearch] = useState('')
@@ -131,7 +131,13 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
           ) : (
             <div className="session-list">
               {filtered.map(s => (
-                <div key={s.id} className="session-card" onClick={() => setModal({ session: s })}>
+                <div key={s.id} className="session-card" onClick={() => {
+                    if (window.matchMedia('(min-width: 769px)').matches) {
+                      onSelectSession?.(s)
+                    } else {
+                      setModal({ session: s })
+                    }
+                  }}>
                   <div className="session-card-left">
                     <div className="avatar">{initials(s.nombre)}</div>
                     <div className="session-card-info">

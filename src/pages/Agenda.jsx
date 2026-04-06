@@ -6,7 +6,7 @@ import { useConfig } from '../hooks/useConfig'
 import { useToast } from '../hooks/useToast'
 import SessionModal from '../components/SessionModal'
 
-export default function Agenda({ sessions, createSession, updateSession }) {
+export default function Agenda({ sessions, createSession, updateSession, onSelectSession }) {
   const { config } = useConfig()
   const toast = useToast()
   const [view, setView] = useState('day')
@@ -39,12 +39,19 @@ export default function Agenda({ sessions, createSession, updateSession }) {
     return format(current, "MMMM yyyy", { locale: es })
   }
 
-  // Normalize hora: Supabase puede devolver "HH:MM:SS", los slots son "HH:MM"
   const getSessionsAt = (dateStr, hora) =>
     sessions.filter(s => s.fecha === dateStr && s.hora?.slice(0, 5) === hora && s.estatus !== 'Cancelada')
 
   const openNew = (date, hora) => setModal({ prefillDate: date, prefillHora: hora })
   const openEdit = (session) => setModal({ session })
+
+  const handleSessionClick = (ses) => {
+    if (window.matchMedia('(min-width: 769px)').matches) {
+      onSelectSession?.(ses)
+    } else {
+      openEdit(ses)
+    }
+  }
 
   const handleSave = async (form) => {
     let result
@@ -71,47 +78,90 @@ export default function Agenda({ sessions, createSession, updateSession }) {
     const dateStr = format(current, 'yyyy-MM-dd')
     const isToday = dateStr === todayS
 
-    // Current time marker
     const nowMinutes = isToday ? new Date().getHours() * 60 + new Date().getMinutes() : null
     const [openH, openM] = (config.open_time || '09:00').split(':').map(Number)
     const openMinutes = openH * 60 + openM
 
-    return (
-      <div className="timeline">
-        {slots.map(slot => {
-          const [h, m] = slot.split(':').map(Number)
-          const slotMinutes = h * 60 + m
-          const isHourStart = m === 0
-          const slotSessions = getSessionsAt(dateStr, slot)
-          const showNow = nowMinutes !== null &&
-            nowMinutes >= slotMinutes &&
-            nowMinutes < slotMinutes + (config.block_minutes || 30)
+    // Daily summary metrics
+    const dayActive = sessions.filter(s => s.fecha === dateStr && !['Cancelada', 'No show'].includes(s.estatus))
+    const dayCount   = dayActive.length
+    const dayAnticipo = dayActive.reduce((a, s) => a + (+s.anticipo || 0), 0)
+    const dayRestante = dayActive.reduce((a, s) => a + (+s.restante || 0), 0)
 
-          return (
-            <div key={slot} className={`timeline-slot${isHourStart ? ' hour-start' : ''}`}>
-              <div className="timeline-time">{slot}</div>
-              <div
-                className="timeline-body"
-                onClick={() => slotSessions.length === 0 && openNew(dateStr, slot)}
-              >
-                {showNow && <div className="timeline-now" />}
-                {slotSessions.map(ses => (
-                  <div
-                    key={ses.id}
-                    className={`timeline-session ${statusClass(ses.estatus)}`}
-                    onClick={e => { e.stopPropagation(); openEdit(ses) }}
-                  >
-                    <div className="timeline-session-name">{ses.nombre}</div>
-                    <div className="timeline-session-meta">
-                      {ses.personas} {ses.personas === 1 ? 'persona' : 'personas'} · {ses.estatus}
-                    </div>
-                  </div>
-                ))}
-              </div>
+    return (
+      <>
+        {dayCount > 0 && (
+          <div className="daily-summary">
+            <div className="ds-item">
+              <div className="ds-label">Sesiones</div>
+              <div className="ds-value">{dayCount}</div>
             </div>
-          )
-        })}
-      </div>
+            {dayAnticipo > 0 && (
+              <div className="ds-item">
+                <div className="ds-label">Anticipos</div>
+                <div className="ds-value green">${dayAnticipo.toLocaleString()}</div>
+              </div>
+            )}
+            {dayRestante > 0 && (
+              <div className="ds-item">
+                <div className="ds-label">Por cobrar</div>
+                <div className="ds-value amber">${dayRestante.toLocaleString()}</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="timeline">
+          {slots.map(slot => {
+            const [h, m] = slot.split(':').map(Number)
+            const slotMinutes = h * 60 + m
+            const isHourStart = m === 0
+            const slotSessions = getSessionsAt(dateStr, slot)
+            const showNow = nowMinutes !== null &&
+              nowMinutes >= slotMinutes &&
+              nowMinutes < slotMinutes + (config.block_minutes || 30)
+
+            return (
+              <div key={slot} className={`timeline-slot${isHourStart ? ' hour-start' : ''}`}>
+                <div className="timeline-time">{slot}</div>
+                <div
+                  className="timeline-body"
+                  onClick={() => slotSessions.length === 0 && openNew(dateStr, slot)}
+                >
+                  {showNow && <div className="timeline-now" />}
+                  {slotSessions.map(ses => (
+                    <div
+                      key={ses.id}
+                      className={`timeline-session ${statusClass(ses.estatus)}`}
+                      onClick={e => { e.stopPropagation(); handleSessionClick(ses) }}
+                    >
+                      <div className="timeline-session-header">
+                        <div className="timeline-session-name">{ses.nombre}</div>
+                        <div className="timeline-session-meta">
+                          {ses.personas} {ses.personas === 1 ? 'persona' : 'personas'} · {ses.estatus}
+                        </div>
+                      </div>
+                      {ses.notas && (
+                        <div className="timeline-session-notes">{ses.notas}</div>
+                      )}
+                      {(+ses.anticipo > 0 || +ses.restante > 0) && (
+                        <div className="timeline-session-money">
+                          {+ses.anticipo > 0 && (
+                            <span className="tsm-anticipo">${(+ses.anticipo).toLocaleString()} ant.</span>
+                          )}
+                          {+ses.restante > 0 && (
+                            <span className="tsm-restante">${(+ses.restante).toLocaleString()} saldo</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </>
     )
   }
 
@@ -122,7 +172,6 @@ export default function Agenda({ sessions, createSession, updateSession }) {
     return (
       <div className="week-scroll">
         <div className="week-grid">
-          {/* Header vacío para columna de hora */}
           <div className="day-header" style={{ borderRight: '1px solid var(--border)' }} />
           {days.map((d, i) => {
             const ds = format(d, 'yyyy-MM-dd')
@@ -152,7 +201,7 @@ export default function Agenda({ sessions, createSession, updateSession }) {
                         key={ses.id}
                         className={`session-block ${statusClass(ses.estatus)}`}
                         title={`${ses.nombre} · ${ses.estatus}`}
-                        onClick={e => { e.stopPropagation(); openEdit(ses) }}
+                        onClick={e => { e.stopPropagation(); handleSessionClick(ses) }}
                       >
                         <div className="session-block-name">{ses.nombre.split(' ')[0]}</div>
                       </div>
@@ -221,7 +270,6 @@ export default function Agenda({ sessions, createSession, updateSession }) {
       </div>
 
       <div className="page-content">
-        {/* Controles de navegación */}
         <div className="agenda-controls">
           <div className="view-tabs">
             {[['day', 'Día', ''], ['week', 'Semana', 'view-tab-week'], ['month', 'Mes', '']].map(([v, label, extra]) => (
