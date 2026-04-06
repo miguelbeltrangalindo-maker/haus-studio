@@ -196,6 +196,18 @@ textarea.form-input { resize: vertical; min-height: 80px; }
 .modal-title { font-family: 'DM Serif Display', serif; font-size: 24px; color: var(--accent2); margin-bottom: 24px; font-style: italic; }
 .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--border); flex-wrap: wrap; }
 
+/* ── Agenda controls ── */
+.agenda-controls {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 20px; flex-wrap: wrap;
+}
+.agenda-nav { display: flex; align-items: center; gap: 6px; flex: 1; justify-content: center; }
+.agenda-nav-title {
+  font-size: 15px; font-weight: 500;
+  min-width: 220px; text-align: center;
+  text-transform: capitalize; color: var(--text);
+}
+
 /* ── Calendar ── */
 .week-grid {
   display: grid;
@@ -206,11 +218,19 @@ textarea.form-input { resize: vertical; min-height: 80px; }
 .day-name { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; }
 .day-num { font-size: 20px; font-weight: 500; margin-top: 3px; }
 .day-num.today { color: var(--accent2); }
-.time-label { background: var(--bg2); border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 8px 8px; font-size: 11px; color: var(--text3); text-align: right; height: 60px; display: flex; align-items: flex-start; justify-content: flex-end; padding-top: 8px; }
-.cal-cell { border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); height: 60px; padding: 3px; cursor: pointer; transition: .1s; }
+.time-label { background: var(--bg2); border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 8px; font-size: 11px; color: var(--text3); text-align: right; height: 72px; display: flex; align-items: flex-start; justify-content: flex-end; padding-top: 9px; }
+.cal-cell { border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); height: 72px; padding: 4px; cursor: pointer; transition: .1s; }
 .cal-cell:hover { background: var(--bg3); }
 .cal-cell:last-child { border-right: none; }
-.session-block { border-radius: 4px; padding: 5px 7px; font-size: 12px; font-weight: 500; cursor: pointer; height: 100%; overflow: hidden; }
+
+/* Session blocks (week & day) */
+.session-block {
+  border-radius: 5px; padding: 6px 8px;
+  cursor: pointer; overflow: hidden;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.session-block-name { font-size: 12px; font-weight: 600; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; line-height: 1.3; }
+.session-block-meta { font-size: 11px; opacity: .8; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .session-block.reservada  { background: #2a1f3d; border-left: 3px solid #7c3aed; color: #c4b5fd; }
 .session-block.confirmada { background: var(--blue-bg); border-left: 3px solid var(--blue2); color: var(--blue2); }
 .session-block.completada { background: var(--green-bg); border-left: 3px solid var(--green2); color: var(--green2); }
@@ -219,9 +239,9 @@ textarea.form-input { resize: vertical; min-height: 80px; }
 .session-block.cancelada  { background: var(--red-bg); border-left: 3px solid #ef4444; color: var(--red2); }
 
 /* Day view */
-.day-slot { display: flex; align-items: stretch; border-bottom: 1px solid var(--border); min-height: 68px; }
-.day-time { width: 78px; min-width: 78px; padding: 11px 13px; font-size: 12px; color: var(--text3); border-right: 1px solid var(--border); }
-.day-content { flex: 1; padding: 5px 8px; cursor: pointer; transition: .1s; }
+.day-slot { display: flex; align-items: stretch; border-bottom: 1px solid var(--border); min-height: 72px; }
+.day-time { width: 78px; min-width: 78px; padding: 12px 13px; font-size: 12px; color: var(--text3); border-right: 1px solid var(--border); display: flex; align-items: flex-start; padding-top: 13px; }
+.day-content { flex: 1; padding: 6px 10px; cursor: pointer; transition: .1s; display: flex; flex-direction: column; gap: 4px; }
 .day-content:hover { background: var(--bg3); }
 
 /* Month view */
@@ -242,6 +262,26 @@ textarea.form-input { resize: vertical; min-height: 80px; }
 .pill { padding: 6px 14px; border-radius: 20px; font-size: 13px; cursor: pointer; border: 1px solid var(--border2); color: var(--text2); background: var(--bg2); transition: .1s; }
 .pill.active { border-color: var(--accent); color: var(--accent2); background: rgba(200,184,154,.1); }
 .pill:hover { border-color: #505050; color: var(--text); }
+
+/* ── Session cards (Sesiones page) ── */
+.session-list { display: flex; flex-direction: column; }
+.session-card {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: background .15s; gap: 12px;
+}
+.session-card:last-child { border-bottom: none; }
+.session-card:hover { background: var(--bg3); }
+.session-card-left { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
+.session-card-info { flex: 1; min-width: 0; }
+.session-card-header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 3px; }
+.session-card-name { font-size: 15px; font-weight: 500; }
+.session-card-meta { font-size: 13px; color: var(--text2); }
+.session-card-money { font-size: 13px; margin-top: 3px; display: flex; gap: 10px; flex-wrap: wrap; }
+.session-card-actions { display: flex; flex-direction: column; gap: 5px; flex-shrink: 0; }
+
+/* ── Dashboard grid ── */
+.dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 
 /* Search bar */
 .search-bar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
@@ -286,13 +326,18 @@ textarea.form-input { resize: vertical; min-height: 80px; }
   .nav-item span { display: none; }
   .sidebar-bottom { display: none; }
   .main { margin-left: 0; margin-bottom: 64px; }
-  .page-content { padding: 18px; }
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .page-content { padding: 16px; }
+  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 20px; }
+  .dash-grid { grid-template-columns: 1fr; gap: 14px; }
   .form-grid { grid-template-columns: 1fr; }
-  .week-grid { grid-template-columns: 50px repeat(7, 1fr); }
-  .topbar { padding: 0 18px; }
-  .modal { padding: 22px; }
+  .topbar { padding: 0 16px; height: 54px; }
+  .topbar-title { font-size: 15px; }
+  .modal { padding: 20px; }
   .modal-footer { flex-direction: column; }
+  .agenda-controls { gap: 10px; }
+  .agenda-nav-title { font-size: 13px; min-width: 160px; }
+  .session-card { padding: 12px 14px; }
+  .session-card-name { font-size: 14px; }
 }
 
 /* Utilities */

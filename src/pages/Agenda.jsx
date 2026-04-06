@@ -1,18 +1,17 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { format, addDays, startOfWeek, addWeeks, subWeeks, addMonths, subMonths, getDaysInMonth, startOfMonth, getDay } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { getTimeSlots, statusClass, statusColor, weekDays, fmtDate, todayStr } from '../lib/utils'
 import { useConfig } from '../hooks/useConfig'
 import { useToast } from '../hooks/useToast'
 import SessionModal from '../components/SessionModal'
-import Badge from '../components/Badge'
 
 export default function Agenda({ sessions, createSession, updateSession }) {
   const { config } = useConfig()
   const toast = useToast()
   const [view, setView] = useState('day')
   const [current, setCurrent] = useState(new Date())
-  const [modal, setModal] = useState(null) // { session?, prefillDate?, prefillHora? }
+  const [modal, setModal] = useState(null)
 
   const slots = getTimeSlots(config.open_time, config.close_time, config.block_minutes)
   const todayS = todayStr()
@@ -33,8 +32,9 @@ export default function Agenda({ sessions, createSession, updateSession }) {
     return format(current, "MMMM yyyy", { locale: es })
   }
 
-  const getSessionAt = (dateStr, hora) =>
-    sessions.find(s => s.fecha === dateStr && s.hora === hora && s.estatus !== 'Cancelada')
+  // Normalize hora: Supabase puede devolver "HH:MM:SS", los slots son "HH:MM"
+  const getSessionsAt = (dateStr, hora) =>
+    sessions.filter(s => s.fecha === dateStr && s.hora?.slice(0, 5) === hora && s.estatus !== 'Cancelada')
 
   const openNew = (date, hora) => setModal({ prefillDate: date, prefillHora: hora })
   const openEdit = (session) => setModal({ session })
@@ -62,24 +62,36 @@ export default function Agenda({ sessions, createSession, updateSession }) {
   // ── Day view ──
   const DayView = () => {
     const dateStr = format(current, 'yyyy-MM-dd')
+    const hasSessions = sessions.some(s => s.fecha === dateStr && s.estatus !== 'Cancelada')
+
     return (
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        {!hasSessions && (
+          <div style={{ padding: '16px 20px 8px', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ fontSize: 13, color: 'var(--text2)' }}>Sin sesiones este día — toca cualquier horario para agregar una</div>
+          </div>
+        )}
         {slots.map(slot => {
-          const ses = getSessionAt(dateStr, slot)
+          const slotSessions = getSessionsAt(dateStr, slot)
           return (
             <div key={slot} className="day-slot">
               <div className="day-time">{slot}</div>
-              <div className="day-content" onClick={() => ses ? openEdit(ses) : openNew(dateStr, slot)}>
-                {ses && (
-                  <div className={`session-block ${statusClass(ses.estatus)}`}>
-                    <div style={{ fontWeight: 600, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{ses.nombre}</div>
-                    <div style={{ fontSize: 10, opacity: .8 }}>{ses.personas}p · {ses.estatus}</div>
-                    <div style={{ fontSize: 10, opacity: .7, display: 'flex', gap: 6, marginTop: 2 }}>
-                      {ses.reminder_sent && <span>📱✓</span>}
-                      {ses.link_sent && <span>📸✓</span>}
+              <div
+                className="day-content"
+                onClick={() => slotSessions.length === 0 && openNew(dateStr, slot)}
+              >
+                {slotSessions.map(ses => (
+                  <div
+                    key={ses.id}
+                    className={`session-block ${statusClass(ses.estatus)}`}
+                    onClick={e => { e.stopPropagation(); openEdit(ses) }}
+                  >
+                    <div className="session-block-name">{ses.nombre}</div>
+                    <div className="session-block-meta">
+                      {ses.personas} {ses.personas === 1 ? 'persona' : 'personas'} · {ses.estatus}
                     </div>
                   </div>
-                )}
+                ))}
               </div>
             </div>
           )
@@ -93,35 +105,49 @@ export default function Agenda({ sessions, createSession, updateSession }) {
     const mon = startOfWeek(current, { weekStartsOn: 1 })
     const days = Array.from({ length: 7 }, (_, i) => addDays(mon, i))
     return (
-      <div className="week-grid">
-        <div className="day-header" style={{ borderRight: '1px solid var(--border)' }} />
-        {days.map((d, i) => {
-          const ds = format(d, 'yyyy-MM-dd')
-          return (
-            <div key={i} className="day-header">
-              <div className="day-name">{weekDays[i]}</div>
-              <div className={`day-num ${ds === todayS ? 'today' : ''}`}>{d.getDate()}</div>
-            </div>
-          )
-        })}
-        {slots.map(slot => (
-          <>
-            <div key={`t-${slot}`} className="time-label">{slot}</div>
-            {days.map((d, i) => {
-              const ds = format(d, 'yyyy-MM-dd')
-              const ses = getSessionAt(ds, slot)
-              return (
-                <div key={`${i}-${slot}`} className="cal-cell" onClick={() => ses ? openEdit(ses) : openNew(ds, slot)}>
-                  {ses && (
-                    <div className={`session-block ${statusClass(ses.estatus)}`} title={ses.nombre}>
-                      <div style={{ fontSize: 10, fontWeight: 600, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{ses.nombre}</div>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </>
-        ))}
+      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        <div className="week-grid" style={{ minWidth: 580 }}>
+          {/* Header vacío para columna de hora */}
+          <div className="day-header" style={{ borderRight: '1px solid var(--border)' }} />
+          {days.map((d, i) => {
+            const ds = format(d, 'yyyy-MM-dd')
+            const isToday = ds === todayS
+            return (
+              <div key={i} className="day-header" style={{ background: isToday ? 'rgba(200,184,154,.06)' : undefined }}>
+                <div className="day-name">{weekDays[i]}</div>
+                <div className={`day-num ${isToday ? 'today' : ''}`}>{d.getDate()}</div>
+              </div>
+            )
+          })}
+
+          {slots.map(slot => (
+            <Fragment key={slot}>
+              <div className="time-label">{slot}</div>
+              {days.map((d, i) => {
+                const ds = format(d, 'yyyy-MM-dd')
+                const slotSessions = getSessionsAt(ds, slot)
+                return (
+                  <div
+                    key={`${i}-${slot}`}
+                    className="cal-cell"
+                    onClick={() => slotSessions.length === 0 && openNew(ds, slot)}
+                  >
+                    {slotSessions.map(ses => (
+                      <div
+                        key={ses.id}
+                        className={`session-block ${statusClass(ses.estatus)}`}
+                        title={`${ses.nombre} · ${ses.estatus}`}
+                        onClick={e => { e.stopPropagation(); openEdit(ses) }}
+                      >
+                        <div className="session-block-name">{ses.nombre.split(' ')[0]}</div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })}
+            </Fragment>
+          ))}
+        </div>
       </div>
     )
   }
@@ -134,8 +160,7 @@ export default function Agenda({ sessions, createSession, updateSession }) {
     const daysInMonth = getDaysInMonth(current)
     const cells = []
     for (let i = 0; i < startDay; i++) {
-      const d = new Date(y, m, 1 - startDay + i)
-      cells.push({ date: d, out: true })
+      cells.push({ date: new Date(y, m, 1 - startDay + i), out: true })
     }
     for (let day = 1; day <= daysInMonth; day++) cells.push({ date: new Date(y, m, day), out: false })
     const remaining = (7 - cells.length % 7) % 7
@@ -152,15 +177,20 @@ export default function Agenda({ sessions, createSession, updateSession }) {
             const daySes = sessions.filter(s => s.fecha === ds && s.estatus !== 'Cancelada')
             const isToday = ds === todayS
             return (
-              <div key={idx} className={`month-cell ${cell.out ? 'other-month' : ''}`}
-                onClick={() => { setCurrent(cell.date); setView('day') }}>
+              <div
+                key={idx}
+                className={`month-cell ${cell.out ? 'other-month' : ''}`}
+                onClick={() => { setCurrent(cell.date); setView('day') }}
+              >
                 <div className={`month-day-num ${isToday ? 'today-num' : ''}`}>{cell.date.getDate()}</div>
                 {daySes.slice(0, 3).map(s => (
                   <div key={s.id} className="month-ses-dot" style={{ borderLeft: `2px solid ${statusColor(s.estatus)}` }}>
-                    {s.hora} {s.nombre.split(' ')[0]}
+                    {s.hora?.slice(0, 5)} {s.nombre.split(' ')[0]}
                   </div>
                 ))}
-                {daySes.length > 3 && <div style={{ fontSize: 10, color: 'var(--text3)', padding: '1px 4px' }}>+{daySes.length - 3} más</div>}
+                {daySes.length > 3 && (
+                  <div style={{ fontSize: 11, color: 'var(--text3)', padding: '1px 4px' }}>+{daySes.length - 3} más</div>
+                )}
               </div>
             )
           })}
@@ -179,19 +209,22 @@ export default function Agenda({ sessions, createSession, updateSession }) {
       </div>
 
       <div className="page-content">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+        {/* Controles de navegación */}
+        <div className="agenda-controls">
           <div className="view-tabs">
-            {['day', 'week', 'month'].map(v => (
+            {[['day', 'Día'], ['week', 'Semana'], ['month', 'Mes']].map(([v, label]) => (
               <button key={v} className={`view-tab ${view === v ? 'active' : ''}`} onClick={() => setView(v)}>
-                {{ day: 'Día', week: 'Semana', month: 'Mes' }[v]}
+                {label}
               </button>
             ))}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+
+          <div className="agenda-nav">
             <button className="btn btn-ghost btn-sm" onClick={() => nav(-1)}>‹</button>
-            <span style={{ fontSize: 14, fontWeight: 500, minWidth: 200, textAlign: 'center', textTransform: 'capitalize' }}>{calTitle()}</span>
+            <span className="agenda-nav-title">{calTitle()}</span>
             <button className="btn btn-ghost btn-sm" onClick={() => nav(1)}>›</button>
           </div>
+
           <button className="btn btn-sm" onClick={() => setCurrent(new Date())}>Hoy</button>
         </div>
 

@@ -36,21 +36,33 @@ export default function Dashboard({ sessions, loading, createSession, updateSess
     setModal(false)
   }
 
-  const dateLabel = new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+  const dateLabel = new Date().toLocaleDateString('es-MX', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+  })
+
+  const SessionRow = ({ s }) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0', borderBottom: '1px solid var(--border)' }}>
+      <div className="avatar">{initials(s.nombre)}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {s.nombre}
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 2 }}>
+          {s.hora?.slice(0, 5)} · {s.personas} {s.personas === 1 ? 'persona' : 'personas'}
+        </div>
+      </div>
+      <Badge status={s.estatus} />
+    </div>
+  )
 
   const MiniList = ({ list, empty }) => {
     if (loading) return <div className="loading">Cargando…</div>
-    if (!list.length) return <div className="empty-state" style={{ padding: '24px' }}><div style={{ fontSize: 12 }}>{empty}</div></div>
-    return list.slice(0, 6).map(s => (
-      <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '1px solid var(--border)' }}>
-        <div className="avatar">{initials(s.nombre)}</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.nombre}</div>
-          <div style={{ fontSize: 11, color: 'var(--text3)' }}>{s.hora} · {s.personas} persona{s.personas > 1 ? 's' : ''}</div>
-        </div>
-        <Badge status={s.estatus} />
+    if (!list.length) return (
+      <div style={{ padding: '20px 0', textAlign: 'center', fontSize: 14, color: 'var(--text2)' }}>
+        {empty}
       </div>
-    ))
+    )
+    return list.slice(0, 5).map(s => <SessionRow key={s.id} s={s} />)
   }
 
   return (
@@ -58,35 +70,64 @@ export default function Dashboard({ sessions, loading, createSession, updateSess
       <div className="topbar">
         <div className="topbar-title">Dashboard</div>
         <div className="topbar-right">
-          <span style={{ fontSize: 12, color: 'var(--text3)' }}>{dateLabel}</span>
+          <span style={{ fontSize: 13, color: 'var(--text2)' }}>{dateLabel}</span>
           <button className="btn btn-primary btn-sm" onClick={() => setModal(true)}>+ Nueva sesión</button>
         </div>
       </div>
 
       <div className="page-content">
+        {/* Estadísticas */}
         <div className="stats-grid">
-          <div className="stat-card"><div className="stat-label">Sesiones hoy</div><div className="stat-value blue">{todaySes.length}</div><div className="stat-sub">{todaySes.filter(s => s.estatus === 'Confirmada').length} confirmadas</div></div>
-          <div className="stat-card"><div className="stat-label">Sesiones mañana</div><div className="stat-value">{tomorrowSes.length}</div></div>
-          <div className="stat-card"><div className="stat-label">Esta semana</div><div className="stat-value purple">{weekSes.length}</div></div>
-          <div className="stat-card"><div className="stat-label">Anticipos recibidos</div><div className="stat-value green">${totalAnticipo.toLocaleString()}</div></div>
-          <div className="stat-card"><div className="stat-label">Por cobrar</div><div className="stat-value amber">${totalRestante.toLocaleString()}</div></div>
-          <div className="stat-card"><div className="stat-label">Pendientes entrega</div><div className="stat-value amber">{pendingDelivery.length}</div></div>
-          <div className="stat-card"><div className="stat-label">Entregadas</div><div className="stat-value green">{delivered.length}</div></div>
-          <div className="stat-card"><div className="stat-label">Canceladas</div><div className="stat-value">{cancelled.length}</div></div>
+          <div className="stat-card">
+            <div className="stat-label">Sesiones hoy</div>
+            <div className="stat-value blue">{todaySes.length}</div>
+            <div className="stat-sub">{todaySes.filter(s => s.estatus === 'Confirmada').length} confirmadas</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">Esta semana</div>
+            <div className="stat-value purple">{weekSes.length}</div>
+            <div className="stat-sub">sesiones activas</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">Anticipos recibidos</div>
+            <div className="stat-value green">${totalAnticipo.toLocaleString()}</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">Por cobrar</div>
+            <div className="stat-value amber">${totalRestante.toLocaleString()}</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">Mañana</div>
+            <div className="stat-value">{tomorrowSes.length}</div>
+            <div className="stat-sub">sesiones</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">Pend. de entrega</div>
+            <div className="stat-value amber">{pendingDelivery.length}</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">Entregadas</div>
+            <div className="stat-value green">{delivered.length}</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">Canceladas</div>
+            <div className="stat-value">{cancelled.length}</div>
+          </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 20 }}>
+        {/* Listas */}
+        <div className="dash-grid">
           <div className="card">
             <div className="section-title">Sesiones de hoy</div>
             <MiniList list={todaySes} empty="Sin sesiones hoy" />
           </div>
           <div className="card">
-            <div className="section-title">Próximas — mañana</div>
+            <div className="section-title">Mañana</div>
             <MiniList list={tomorrowSes} empty="Sin sesiones mañana" />
           </div>
         </div>
 
-        <div className="card">
+        <div className="card" style={{ marginTop: 20 }}>
           <div className="section-title">Pendientes de entrega</div>
           <MiniList list={pendingDelivery} empty="Sin pendientes de entrega" />
         </div>
