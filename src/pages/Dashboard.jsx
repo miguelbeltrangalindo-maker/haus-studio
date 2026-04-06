@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { format, addDays } from 'date-fns'
+import { format, addDays, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { todayStr, tomorrowStr, initials, fmtDate } from '../lib/utils'
+import { todayStr, tomorrowStr, initials } from '../lib/utils'
 import Badge from '../components/Badge'
 import SessionModal from '../components/SessionModal'
 import { useToast } from '../hooks/useToast'
@@ -16,25 +16,42 @@ export default function Dashboard({ sessions, loading, createSession, updateSess
 
   const today    = todayStr()
   const tomorrow = tomorrowStr()
-  const rangeDays = config.stats_range || 30
-  const rangeEnd  = format(addDays(new Date(), rangeDays - 1), 'yyyy-MM-dd')
 
-  // Sessions in the configurable range (from today onward)
-  const rangeSessions = sessions.filter(s => s.fecha >= today && s.fecha <= rangeEnd)
+  // ── Date range from config ──
+  const effectiveStart = config.stats_start || today
+  const effectiveEnd   = config.stats_end   || format(addDays(new Date(), 29), 'yyyy-MM-dd')
+
+  // Range label for hero
+  const rangeLabel = (() => {
+    try {
+      const s = parseISO(effectiveStart)
+      const e = parseISO(effectiveEnd)
+      const sameYear = s.getFullYear() === e.getFullYear()
+      return `${format(s, "d 'de' MMM", { locale: es })} — ${format(e, sameYear ? "d 'de' MMM yyyy" : "d 'de' MMM yyyy", { locale: es })}`
+    } catch { return '' }
+  })()
+
+  // Sessions in range
+  const rangeSessions = sessions.filter(s => s.fecha >= effectiveStart && s.fecha <= effectiveEnd)
   const rangeActive   = rangeSessions.filter(s => !['Cancelada', 'No show'].includes(s.estatus))
 
-  // Range-based metrics
-  const totalSessions   = rangeSessions.filter(s => s.estatus !== 'No show').length
-  const pendEntrega     = rangeActive.filter(s => s.estatus === 'Pendiente de entrega')
-  const pendPago        = rangeActive.filter(s => s.estatus === 'Pendiente de pago')
-  const entregadas      = rangeSessions.filter(s => s.estatus === 'Entregada')
-  const canceladas      = rangeSessions.filter(s => ['Cancelada', 'No show'].includes(s.estatus))
-  const confirmadas     = rangeActive.filter(s => ['Confirmada', 'Llegó', 'En sesión'].includes(s.estatus))
+  // Range metrics
+  const totalSessions = rangeSessions.filter(s => !['Cancelada', 'No show'].includes(s.estatus)).length
+  const confirmadas   = rangeActive.filter(s => ['Reservada', 'Confirmada', 'Llegó', 'En sesión'].includes(s.estatus))
+  const pendEntrega   = rangeActive.filter(s => s.estatus === 'Pendiente de entrega')
+  const pendPago      = rangeActive.filter(s => s.estatus === 'Pendiente de pago')
+  const entregadas    = rangeSessions.filter(s => s.estatus === 'Entregada')
+  const canceladas    = rangeSessions.filter(s => ['Cancelada', 'No show'].includes(s.estatus))
+  // Liquidadas: completed/delivered sessions with no pending balance
+  const liquidadas    = rangeActive.filter(s =>
+    ['Completada', 'Entregada', 'Pendiente de entrega'].includes(s.estatus) &&
+    (+s.restante === 0 || s.restante === '' || s.restante == null)
+  )
 
-  const totalAnticipo   = rangeActive.reduce((a, s) => a + (+s.anticipo || 0), 0)
-  const totalRestante   = rangeActive.reduce((a, s) => a + (+s.restante || 0), 0)
+  const totalAnticipo = rangeActive.reduce((a, s) => a + (+s.anticipo || 0), 0)
+  const totalRestante = rangeActive.reduce((a, s) => a + (+s.restante || 0), 0)
 
-  // Today / tomorrow lists (independent of range)
+  // Today / tomorrow (always current, independent of range)
   const todaySes    = sessions
     .filter(s => s.fecha === today && !['Cancelada', 'No show'].includes(s.estatus))
     .sort((a, b) => a.hora > b.hora ? 1 : -1)
@@ -48,13 +65,6 @@ export default function Dashboard({ sessions, loading, createSession, updateSess
     toast('Sesión creada', 'success')
     setModal(false)
   }
-
-  const rangeLabel = rangeDays === 7  ? 'próximos 7 días'
-    : rangeDays === 14 ? 'próximas 2 semanas'
-    : rangeDays === 30 ? 'próximos 30 días'
-    : rangeDays === 60 ? 'próximos 2 meses'
-    : rangeDays === 90 ? 'próximos 3 meses'
-    : `próximos ${rangeDays} días`
 
   const SessionRow = ({ s }) => (
     <div className="session-row" style={{ cursor: 'pointer' }} onClick={() => navigate('/sesiones')}>
@@ -79,6 +89,10 @@ export default function Dashboard({ sessions, loading, createSession, updateSess
     return list.slice(0, 5).map(s => <SessionRow key={s.id} s={s} />)
   }
 
+  const KpiIcon = ({ children, color }) => (
+    <div className={`dash-kpi-icon ${color}`}>{children}</div>
+  )
+
   return (
     <>
       <div className="topbar">
@@ -88,7 +102,7 @@ export default function Dashboard({ sessions, loading, createSession, updateSess
         </div>
       </div>
 
-      {/* Hero — range total */}
+      {/* Hero */}
       <div className="dash-hero">
         <div className="dash-hero-label">{rangeLabel}</div>
         <div className="dash-hero-headline">
@@ -110,16 +124,16 @@ export default function Dashboard({ sessions, loading, createSession, updateSess
         )}
       </div>
 
-      {/* KPI strip — all range-based */}
+      {/* KPI strip */}
       <div className="dash-kpis">
 
         <div className="dash-kpi" onClick={() => navigate('/sesiones')} style={{ cursor: 'pointer' }}>
-          <div className="dash-kpi-icon violet">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <KpiIcon color="violet">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
               <rect x="1.5" y="2.5" width="13" height="12" rx="1.5"/>
               <path d="M5 1.5v2M11 1.5v2M1.5 6.5h13"/>
             </svg>
-          </div>
+          </KpiIcon>
           <div>
             <div className="dash-kpi-value">{confirmadas.length}</div>
             <div className="dash-kpi-label">Confirmadas</div>
@@ -127,11 +141,11 @@ export default function Dashboard({ sessions, loading, createSession, updateSess
         </div>
 
         <div className="dash-kpi" onClick={() => navigate('/sesiones')} style={{ cursor: 'pointer' }}>
-          <div className="dash-kpi-icon amber">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <KpiIcon color="amber">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
               <circle cx="8" cy="8" r="6.5"/><path d="M8 5v3l2 2"/>
             </svg>
-          </div>
+          </KpiIcon>
           <div>
             <div className="dash-kpi-value" style={{ color: pendEntrega.length > 0 ? 'var(--amber-l)' : undefined }}>
               {pendEntrega.length}
@@ -141,12 +155,12 @@ export default function Dashboard({ sessions, loading, createSession, updateSess
         </div>
 
         <div className="dash-kpi" onClick={() => navigate('/sesiones')} style={{ cursor: 'pointer' }}>
-          <div className="dash-kpi-icon amber">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <rect x="1.5" y="5" width="13" height="8" rx="1.5"/>
-              <path d="M5 5V4a3 3 0 016 0v1"/>
+          <KpiIcon color="amber">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <rect x="1.5" y="5.5" width="13" height="8" rx="1.5"/>
+              <path d="M5 5.5V4a3 3 0 016 0v1.5"/>
             </svg>
-          </div>
+          </KpiIcon>
           <div>
             <div className="dash-kpi-value" style={{ color: pendPago.length > 0 ? 'var(--amber-l)' : undefined }}>
               {pendPago.length}
@@ -156,11 +170,12 @@ export default function Dashboard({ sessions, loading, createSession, updateSess
         </div>
 
         <div className="dash-kpi">
-          <div className="dash-kpi-icon amber">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M2 8h12M8 2v12"/>
+          <KpiIcon color="amber">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <circle cx="8" cy="9" r="5.5"/><path d="M8 6.5v2.5l1.5 1.5"/>
+              <path d="M5.5 1.5h5M8 1.5v2"/>
             </svg>
-          </div>
+          </KpiIcon>
           <div>
             <div className="dash-kpi-value" style={{ color: totalRestante > 0 ? 'var(--amber-l)' : undefined }}>
               ${totalRestante.toLocaleString()}
@@ -170,11 +185,41 @@ export default function Dashboard({ sessions, loading, createSession, updateSess
         </div>
 
         <div className="dash-kpi">
-          <div className="dash-kpi-icon green">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M2 8h12M8 2v12"/>
+          <KpiIcon color="green">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M3 8l3.5 3.5L13 4"/>
             </svg>
+          </KpiIcon>
+          <div>
+            <div className="dash-kpi-value" style={{ color: liquidadas.length > 0 ? 'var(--green-l)' : undefined }}>
+              {liquidadas.length}
+            </div>
+            <div className="dash-kpi-label">Liquidadas</div>
           </div>
+        </div>
+
+        <div className="dash-kpi">
+          <KpiIcon color="green">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <rect x="2" y="4" width="12" height="9" rx="1.5"/>
+              <path d="M5 4V3a1 1 0 011-1h4a1 1 0 011 1v1"/>
+              <path d="M2 8h12"/>
+            </svg>
+          </KpiIcon>
+          <div>
+            <div className="dash-kpi-value">{entregadas.length}</div>
+            <div className="dash-kpi-label">Entregadas</div>
+          </div>
+        </div>
+
+        <div className="dash-kpi">
+          <KpiIcon color="green">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M2 5h12M2 8h8M2 11h5"/>
+              <circle cx="12" cy="10.5" r="3.5"/>
+              <path d="M10.5 10.5h3M12 9v3"/>
+            </svg>
+          </KpiIcon>
           <div>
             <div className="dash-kpi-value" style={{ color: totalAnticipo > 0 ? 'var(--green-l)' : undefined }}>
               ${totalAnticipo.toLocaleString()}
@@ -183,25 +228,13 @@ export default function Dashboard({ sessions, loading, createSession, updateSess
           </div>
         </div>
 
-        <div className="dash-kpi">
-          <div className="dash-kpi-icon green">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M3 8l3.5 3.5L13 4"/>
-            </svg>
-          </div>
-          <div>
-            <div className="dash-kpi-value">{entregadas.length}</div>
-            <div className="dash-kpi-label">Entregadas</div>
-          </div>
-        </div>
-
         {canceladas.length > 0 && (
           <div className="dash-kpi">
-            <div className="dash-kpi-icon red">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <KpiIcon color="red">
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M4 4l8 8M12 4l-8 8"/>
               </svg>
-            </div>
+            </KpiIcon>
             <div>
               <div className="dash-kpi-value" style={{ color: 'var(--red-l)' }}>{canceladas.length}</div>
               <div className="dash-kpi-label">Canceladas</div>
@@ -210,19 +243,20 @@ export default function Dashboard({ sessions, loading, createSession, updateSess
         )}
 
         <div className="dash-kpi" style={{ cursor: 'pointer' }} onClick={() => setModal(true)}>
-          <div className="dash-kpi-icon violet">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <KpiIcon color="violet">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M8 3v10M3 8h10"/>
             </svg>
-          </div>
+          </KpiIcon>
           <div>
-            <div className="dash-kpi-value" style={{ color: 'var(--violet-l)' }}>Nueva</div>
+            <div className="dash-kpi-value" style={{ color: 'var(--violet-l)', fontSize: 15 }}>Nueva</div>
             <div className="dash-kpi-label">Agendar sesión</div>
           </div>
         </div>
+
       </div>
 
-      {/* Today / Tomorrow lists */}
+      {/* Today / Tomorrow */}
       <div className="page-content">
         <div className="dash-grid">
           <div className="card">

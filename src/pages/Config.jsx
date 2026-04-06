@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { format, addDays } from 'date-fns'
 import { useConfig } from '../hooks/useConfig'
 import { useToast } from '../hooks/useToast'
 
@@ -18,6 +19,10 @@ export default function Config() {
     toast('Configuración guardada', 'success')
     setSaving(false)
   }
+
+  // Defaults if never saved before
+  const defaultStart = format(new Date(), 'yyyy-MM-dd')
+  const defaultEnd   = format(addDays(new Date(), 29), 'yyyy-MM-dd')
 
   return (
     <>
@@ -57,21 +62,38 @@ export default function Config() {
                   value={form.block_minutes || 30}
                   onChange={e => set('block_minutes', +e.target.value)} />
               </div>
+            </div>
+          </div>
+
+          <div className="config-section">
+            <div className="config-title">Rango de estadísticas — Dashboard</div>
+            <div style={{ marginBottom: 14, fontSize: 13, color: 'var(--text3)' }}>
+              Define el período de fechas para calcular todas las métricas del Dashboard: sesiones agendadas, montos por cobrar, sesiones liquidadas, etc.
+            </div>
+            <div className="form-grid">
               <div className="form-group">
-                <label className="form-label">Rango de estadísticas (días)</label>
-                <select className="form-input" value={form.stats_range || 30}
-                  onChange={e => set('stats_range', +e.target.value)}>
-                  <option value={7}>Próximos 7 días</option>
-                  <option value={14}>Próximas 2 semanas</option>
-                  <option value={30}>Próximos 30 días</option>
-                  <option value={60}>Próximos 2 meses</option>
-                  <option value={90}>Próximos 3 meses</option>
-                </select>
-                <span style={{ fontSize: 12, color: 'var(--text3)' }}>
-                  Período que se muestra en el Dashboard
-                </span>
+                <label className="form-label">Fecha de inicio</label>
+                <input className="form-input" type="date"
+                  value={form.stats_start || defaultStart}
+                  onChange={e => set('stats_start', e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Fecha de fin</label>
+                <input className="form-input" type="date"
+                  value={form.stats_end || defaultEnd}
+                  min={form.stats_start || defaultStart}
+                  onChange={e => set('stats_end', e.target.value)} />
               </div>
             </div>
+            {(form.stats_start || form.stats_end) && (
+              <button
+                className="btn btn-ghost btn-sm"
+                style={{ marginTop: 10 }}
+                onClick={() => { set('stats_start', ''); set('stats_end', '') }}
+              >
+                Restablecer a 30 días desde hoy
+              </button>
+            )}
           </div>
 
           <div className="config-section">

@@ -849,6 +849,65 @@ textarea.form-input { resize: vertical; min-height: 84px; line-height: 1.6; }
 .toast.success { border-color: rgba(34, 197, 94, .4); }
 .toast.error   { border-color: rgba(239, 68, 68, .4); }
 
+/* ─── Payment panel ──────────────────────────────────────────── */
+.payment-panel {
+  background: rgba(245, 158, 11, .04);
+  border: 1px solid rgba(245, 158, 11, .2);
+  border-radius: var(--r2);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.payment-summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.payment-summary-label {
+  font-size: 13px;
+  color: var(--text2);
+  font-weight: 500;
+}
+.payment-summary-amount {
+  font-family: 'Playfair Display', serif;
+  font-size: 28px;
+  font-style: italic;
+  color: var(--amber-l);
+  line-height: 1;
+}
+
+.method-tabs {
+  display: flex;
+  gap: 6px;
+}
+.method-tab {
+  flex: 1;
+  height: 40px;
+  border-radius: var(--r2);
+  border: 1px solid var(--border2);
+  background: var(--bg4);
+  color: var(--text2);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all .12s;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+}
+.method-tab.active {
+  background: rgba(139, 92, 246, .12);
+  border-color: rgba(139, 92, 246, .35);
+  color: var(--violet-l);
+}
+.method-tab:hover:not(.active) {
+  background: var(--bg5);
+  color: var(--text);
+}
+
 /* ─── Config ─────────────────────────────────────────────────── */
 .config-section { margin-bottom: 36px; }
 .config-title {

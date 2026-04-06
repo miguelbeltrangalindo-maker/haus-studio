@@ -4,6 +4,12 @@ import { useConfig } from '../hooks/useConfig'
 import { useToast } from '../hooks/useToast'
 import Badge from './Badge'
 
+const METHODS = [
+  { key: 'efectivo',      label: 'Efectivo' },
+  { key: 'transferencia', label: 'Transferencia' },
+  { key: 'tarjeta',       label: 'Tarjeta' },
+]
+
 export default function SessionModal({ session, prefillDate, prefillHora, onSave, onClose, onDelete }) {
   const { config } = useConfig()
   const toast = useToast()
@@ -18,6 +24,7 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
     estatus: 'Reservada',
     anticipo: '',
     restante: '',
+    metodo_pago: '',
     notas: '',
     link: '',
     seguimiento: '',
@@ -25,6 +32,10 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
     link_sent: false,
   })
   const [saving, setSaving] = useState(false)
+
+  // Payment panel state
+  const [payAmount, setPayAmount]   = useState('')
+  const [payMethod, setPayMethod]   = useState('efectivo')
 
   useEffect(() => {
     if (session) setForm(f => ({ ...f, ...session }))
@@ -39,6 +50,25 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
     if (!form.hora)  { toast('La hora es requerida', 'error'); return }
     setSaving(true)
     await onSave(form)
+    setSaving(false)
+  }
+
+  // ── Cobrar saldo ──
+  const handleCobrar = async () => {
+    const amount = +payAmount
+    if (!amount || amount <= 0) { toast('Ingresa un monto válido', 'error'); return }
+    const currentRestante = +form.restante || 0
+    if (amount > currentRestante) { toast(`El monto no puede superar $${currentRestante.toLocaleString()}`, 'error'); return }
+    const newRestante = Math.max(0, currentRestante - amount)
+    const updated = {
+      ...form,
+      restante:    String(newRestante),
+      metodo_pago: payMethod,
+      // If now fully paid and was in "Pendiente de pago", advance to Completada
+      estatus: (newRestante === 0 && form.estatus === 'Pendiente de pago') ? 'Completada' : form.estatus,
+    }
+    setSaving(true)
+    await onSave(updated)
     setSaving(false)
   }
 
@@ -63,12 +93,13 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
 
   const nextSt  = nextStatus(form.estatus)
   const nextLbl = nextStatusLabel(form.estatus)
+  const hasPending = !isNew && (+form.restante > 0)
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal" onClick={e => e.stopPropagation()}>
 
-        {/* Encabezado */}
+        {/* Header */}
         <div className="modal-title">{isNew ? 'Nueva sesión' : form.nombre || 'Sesión'}</div>
         {!isNew && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
@@ -137,7 +168,82 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
             <input className="form-input" type="number" min="0" value={form.restante}
               onChange={e => set('restante', e.target.value)} placeholder="0" />
           </div>
+          {form.metodo_pago && (
+            <div className="form-group">
+              <label className="form-label">Último método de pago</label>
+              <input className="form-input" value={
+                form.metodo_pago === 'efectivo' ? 'Efectivo'
+                : form.metodo_pago === 'transferencia' ? 'Transferencia'
+                : 'Tarjeta'
+              } readOnly style={{ color: 'var(--text3)', cursor: 'default' }} />
+            </div>
+          )}
         </div>
+
+        {/* ── Cobrar saldo pendiente ── */}
+        {hasPending && (
+          <>
+            <div className="modal-section-title" style={{ color: 'var(--amber-l)' }}>
+              Cobrar saldo pendiente
+            </div>
+            <div className="payment-panel">
+              <div className="payment-summary">
+                <span className="payment-summary-label">Saldo pendiente</span>
+                <span className="payment-summary-amount">${(+form.restante).toLocaleString()}</span>
+              </div>
+
+              <div className="form-grid">
+                <div className="form-group">
+                  <label className="form-label">Monto a cobrar ($)</label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    min="1"
+                    max={form.restante}
+                    value={payAmount}
+                    onChange={e => setPayAmount(e.target.value)}
+                    placeholder={form.restante}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Método de pago</label>
+                  <div className="method-tabs">
+                    {METHODS.map(m => (
+                      <button
+                        key={m.key}
+                        type="button"
+                        className={`method-tab ${payMethod === m.key ? 'active' : ''}`}
+                        onClick={() => setPayMethod(m.key)}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={handleCobrar}
+                  disabled={saving || !payAmount || +payAmount <= 0}
+                >
+                  {saving ? 'Guardando…' : 'Cobrar y guardar'}
+                </button>
+                {payAmount && +payAmount > 0 && +payAmount < +form.restante && (
+                  <span style={{ fontSize: 12, color: 'var(--text3)' }}>
+                    Quedará pendiente: ${(+form.restante - +payAmount).toLocaleString()}
+                  </span>
+                )}
+                {payAmount && +payAmount >= +form.restante && (
+                  <span style={{ fontSize: 12, color: 'var(--green-l)' }}>
+                    Saldo liquidado ✓
+                  </span>
+                )}
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Notas y entrega */}
         <div className="modal-section-title">Notas y entrega</div>
