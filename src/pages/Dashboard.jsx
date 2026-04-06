@@ -99,9 +99,6 @@ export default function Dashboard({ sessions, loading, createSession, updateSess
     <>
       <div className="topbar">
         <div className="topbar-title">Dashboard</div>
-        <div className="topbar-right">
-          <button className="btn btn-primary btn-sm" onClick={() => setModal(true)}>+ Nueva sesión</button>
-        </div>
       </div>
 
       {/* Hero */}
@@ -245,18 +242,6 @@ export default function Dashboard({ sessions, loading, createSession, updateSess
             </div>
           </div>
         )}
-
-        <div className="dash-kpi" style={{ cursor: 'pointer' }} onClick={() => setModal(true)}>
-          <KpiIcon color="violet">
-            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M8 3v10M3 8h10"/>
-            </svg>
-          </KpiIcon>
-          <div>
-            <div className="dash-kpi-value" style={{ color: 'var(--violet-l)', fontSize: 15 }}>Nueva</div>
-            <div className="dash-kpi-label">Agendar sesión</div>
-          </div>
-        </div>
 
       </div>
 
