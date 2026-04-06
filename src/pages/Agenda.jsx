@@ -1,7 +1,7 @@
 import { Fragment, useState, useEffect } from 'react'
 import { format, addDays, startOfWeek, addWeeks, subWeeks, addMonths, subMonths, getDaysInMonth, startOfMonth, getDay } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { getTimeSlots, statusClass, statusColor, weekDays, fmtDate, todayStr } from '../lib/utils'
+import { getTimeSlots, statusClass, weekDays, fmtDate, todayStr } from '../lib/utils'
 import { useConfig } from '../hooks/useConfig'
 import { useToast } from '../hooks/useToast'
 import SessionModal from '../components/SessionModal'
@@ -198,13 +198,10 @@ export default function Agenda({ sessions, createSession, updateSession }) {
                 onClick={() => { setCurrent(cell.date); setView('day') }}
               >
                 <div className={`month-day-num ${isToday ? 'today-num' : ''}`}>{cell.date.getDate()}</div>
-                {daySes.slice(0, 3).map(s => (
-                  <div key={s.id} className="month-ses-dot" style={{ borderLeft: `2px solid ${statusColor(s.estatus)}` }}>
-                    {s.hora?.slice(0, 5)} {s.nombre.split(' ')[0]}
+                {daySes.length > 0 && (
+                  <div className={`month-ses-count ${daySes.length >= 9 ? 'red' : daySes.length >= 6 ? 'amber' : 'green'}`}>
+                    {daySes.length}
                   </div>
-                ))}
-                {daySes.length > 3 && (
-                  <div style={{ fontSize: 11, color: 'var(--text3)', padding: '1px 4px' }}>+{daySes.length - 3} más</div>
                 )}
               </div>
             )

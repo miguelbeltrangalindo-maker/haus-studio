@@ -1,38 +1,46 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { format } from 'date-fns'
+import { format, addDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { todayStr, tomorrowStr, initials, fmtDate } from '../lib/utils'
 import Badge from '../components/Badge'
 import SessionModal from '../components/SessionModal'
 import { useToast } from '../hooks/useToast'
+import { useConfig } from '../hooks/useConfig'
 
 export default function Dashboard({ sessions, loading, createSession, updateSession }) {
   const toast    = useToast()
   const navigate = useNavigate()
+  const { config } = useConfig()
   const [modal, setModal] = useState(false)
 
   const today    = todayStr()
   const tomorrow = tomorrowStr()
+  const rangeDays = config.stats_range || 30
+  const rangeEnd  = format(addDays(new Date(), rangeDays - 1), 'yyyy-MM-dd')
 
-  const active      = sessions.filter(s => !['Cancelada', 'No show'].includes(s.estatus))
-  const todaySes    = active.filter(s => s.fecha === today).sort((a, b) => a.hora > b.hora ? 1 : -1)
-  const tomorrowSes = active.filter(s => s.fecha === tomorrow).sort((a, b) => a.hora > b.hora ? 1 : -1)
-  const pendEntrega = active.filter(s => s.estatus === 'Pendiente de entrega')
-  const pendPago    = active.filter(s => s.estatus === 'Pendiente de pago')
-  const entregadas  = sessions.filter(s => s.estatus === 'Entregada')
+  // Sessions in the configurable range (from today onward)
+  const rangeSessions = sessions.filter(s => s.fecha >= today && s.fecha <= rangeEnd)
+  const rangeActive   = rangeSessions.filter(s => !['Cancelada', 'No show'].includes(s.estatus))
 
-  const now = new Date()
-  const weekStart = new Date(now); weekStart.setDate(now.getDate() - ((now.getDay() + 6) % 7))
-  const weekEnd   = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6)
-  const weekSes   = active.filter(s => {
-    const d = new Date(s.fecha + 'T00:00')
-    return d >= weekStart && d <= weekEnd
-  })
+  // Range-based metrics
+  const totalSessions   = rangeSessions.filter(s => s.estatus !== 'No show').length
+  const pendEntrega     = rangeActive.filter(s => s.estatus === 'Pendiente de entrega')
+  const pendPago        = rangeActive.filter(s => s.estatus === 'Pendiente de pago')
+  const entregadas      = rangeSessions.filter(s => s.estatus === 'Entregada')
+  const canceladas      = rangeSessions.filter(s => ['Cancelada', 'No show'].includes(s.estatus))
+  const confirmadas     = rangeActive.filter(s => ['Confirmada', 'Llegó', 'En sesión'].includes(s.estatus))
 
-  const cobradoHoy  = todaySes.reduce((a, s) => a + (+s.anticipo || 0), 0)
-  const restanteHoy = todaySes.reduce((a, s) => a + (+s.restante || 0), 0)
-  const totalRestante = active.reduce((a, s) => a + (+s.restante || 0), 0)
+  const totalAnticipo   = rangeActive.reduce((a, s) => a + (+s.anticipo || 0), 0)
+  const totalRestante   = rangeActive.reduce((a, s) => a + (+s.restante || 0), 0)
+
+  // Today / tomorrow lists (independent of range)
+  const todaySes    = sessions
+    .filter(s => s.fecha === today && !['Cancelada', 'No show'].includes(s.estatus))
+    .sort((a, b) => a.hora > b.hora ? 1 : -1)
+  const tomorrowSes = sessions
+    .filter(s => s.fecha === tomorrow && !['Cancelada', 'No show'].includes(s.estatus))
+    .sort((a, b) => a.hora > b.hora ? 1 : -1)
 
   const handleCreate = async (form) => {
     const { error } = await createSession(form)
@@ -41,7 +49,12 @@ export default function Dashboard({ sessions, loading, createSession, updateSess
     setModal(false)
   }
 
-  const dateLabel = format(new Date(), "EEEE, d 'de' MMMM yyyy", { locale: es })
+  const rangeLabel = rangeDays === 7  ? 'próximos 7 días'
+    : rangeDays === 14 ? 'próximas 2 semanas'
+    : rangeDays === 30 ? 'próximos 30 días'
+    : rangeDays === 60 ? 'próximos 2 meses'
+    : rangeDays === 90 ? 'próximos 3 meses'
+    : `próximos ${rangeDays} días`
 
   const SessionRow = ({ s }) => (
     <div className="session-row" style={{ cursor: 'pointer' }} onClick={() => navigate('/sesiones')}>
@@ -75,29 +88,32 @@ export default function Dashboard({ sessions, loading, createSession, updateSess
         </div>
       </div>
 
-      {/* Hero */}
+      {/* Hero — range total */}
       <div className="dash-hero">
-        <div className="dash-hero-label" style={{ textTransform: 'capitalize' }}>{dateLabel}</div>
+        <div className="dash-hero-label">{rangeLabel}</div>
         <div className="dash-hero-headline">
-          <span className="dash-hero-count">{todaySes.length}</span>
-          <span className="dash-hero-unit">{todaySes.length === 1 ? 'sesión hoy' : 'sesiones hoy'}</span>
+          <span className="dash-hero-count">{totalSessions}</span>
+          <span className="dash-hero-unit">{totalSessions === 1 ? 'sesión agendada' : 'sesiones agendadas'}</span>
         </div>
-        {(cobradoHoy > 0 || restanteHoy > 0) && (
+        {(totalAnticipo > 0 || totalRestante > 0) && (
           <div className="dash-hero-money">
-            {cobradoHoy > 0 && (
-              <span className="money-cobrado">${cobradoHoy.toLocaleString()} cobrados</span>
+            {totalAnticipo > 0 && (
+              <span className="money-cobrado">${totalAnticipo.toLocaleString()} en anticipos</span>
             )}
-            {cobradoHoy > 0 && restanteHoy > 0 && <span style={{ color: 'var(--text3)', margin: '0 8px' }}>·</span>}
-            {restanteHoy > 0 && (
-              <span className="money-pendiente">${restanteHoy.toLocaleString()} por cobrar hoy</span>
+            {totalAnticipo > 0 && totalRestante > 0 && (
+              <span style={{ color: 'var(--text3)', margin: '0 8px' }}>·</span>
+            )}
+            {totalRestante > 0 && (
+              <span className="money-pendiente">${totalRestante.toLocaleString()} por cobrar</span>
             )}
           </div>
         )}
       </div>
 
-      {/* KPI strip */}
+      {/* KPI strip — all range-based */}
       <div className="dash-kpis">
-        <div className="dash-kpi" onClick={() => navigate('/agenda')} style={{ cursor: 'pointer' }}>
+
+        <div className="dash-kpi" onClick={() => navigate('/sesiones')} style={{ cursor: 'pointer' }}>
           <div className="dash-kpi-icon violet">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
               <rect x="1.5" y="2.5" width="13" height="12" rx="1.5"/>
@@ -105,8 +121,8 @@ export default function Dashboard({ sessions, loading, createSession, updateSess
             </svg>
           </div>
           <div>
-            <div className="dash-kpi-value">{weekSes.length}</div>
-            <div className="dash-kpi-label">Esta semana</div>
+            <div className="dash-kpi-value">{confirmadas.length}</div>
+            <div className="dash-kpi-label">Confirmadas</div>
           </div>
         </div>
 
@@ -124,10 +140,25 @@ export default function Dashboard({ sessions, loading, createSession, updateSess
           </div>
         </div>
 
+        <div className="dash-kpi" onClick={() => navigate('/sesiones')} style={{ cursor: 'pointer' }}>
+          <div className="dash-kpi-icon amber">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <rect x="1.5" y="5" width="13" height="8" rx="1.5"/>
+              <path d="M5 5V4a3 3 0 016 0v1"/>
+            </svg>
+          </div>
+          <div>
+            <div className="dash-kpi-value" style={{ color: pendPago.length > 0 ? 'var(--amber-l)' : undefined }}>
+              {pendPago.length}
+            </div>
+            <div className="dash-kpi-label">Pend. pago</div>
+          </div>
+        </div>
+
         <div className="dash-kpi">
           <div className="dash-kpi-icon amber">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M2 4h12M2 8h8M2 12h5"/><circle cx="12" cy="11" r="3"/>
+              <path d="M2 8h12M8 2v12"/>
             </svg>
           </div>
           <div>
@@ -135,6 +166,20 @@ export default function Dashboard({ sessions, loading, createSession, updateSess
               ${totalRestante.toLocaleString()}
             </div>
             <div className="dash-kpi-label">Por cobrar</div>
+          </div>
+        </div>
+
+        <div className="dash-kpi">
+          <div className="dash-kpi-icon green">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M2 8h12M8 2v12"/>
+            </svg>
+          </div>
+          <div>
+            <div className="dash-kpi-value" style={{ color: totalAnticipo > 0 ? 'var(--green-l)' : undefined }}>
+              ${totalAnticipo.toLocaleString()}
+            </div>
+            <div className="dash-kpi-label">Anticipos</div>
           </div>
         </div>
 
@@ -150,17 +195,16 @@ export default function Dashboard({ sessions, loading, createSession, updateSess
           </div>
         </div>
 
-        {pendPago.length > 0 && (
-          <div className="dash-kpi" onClick={() => navigate('/sesiones')} style={{ cursor: 'pointer' }}>
+        {canceladas.length > 0 && (
+          <div className="dash-kpi">
             <div className="dash-kpi-icon red">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <rect x="1.5" y="5" width="13" height="9" rx="1.5"/>
-                <path d="M5 5V3.5a3 3 0 016 0V5"/>
+                <path d="M4 4l8 8M12 4l-8 8"/>
               </svg>
             </div>
             <div>
-              <div className="dash-kpi-value" style={{ color: 'var(--red-l)' }}>{pendPago.length}</div>
-              <div className="dash-kpi-label">Pend. pago</div>
+              <div className="dash-kpi-value" style={{ color: 'var(--red-l)' }}>{canceladas.length}</div>
+              <div className="dash-kpi-label">Canceladas</div>
             </div>
           </div>
         )}
@@ -178,7 +222,7 @@ export default function Dashboard({ sessions, loading, createSession, updateSess
         </div>
       </div>
 
-      {/* Content */}
+      {/* Today / Tomorrow lists */}
       <div className="page-content">
         <div className="dash-grid">
           <div className="card">

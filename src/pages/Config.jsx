@@ -57,6 +57,20 @@ export default function Config() {
                   value={form.block_minutes || 30}
                   onChange={e => set('block_minutes', +e.target.value)} />
               </div>
+              <div className="form-group">
+                <label className="form-label">Rango de estadísticas (días)</label>
+                <select className="form-input" value={form.stats_range || 30}
+                  onChange={e => set('stats_range', +e.target.value)}>
+                  <option value={7}>Próximos 7 días</option>
+                  <option value={14}>Próximas 2 semanas</option>
+                  <option value={30}>Próximos 30 días</option>
+                  <option value={60}>Próximos 2 meses</option>
+                  <option value={90}>Próximos 3 meses</option>
+                </select>
+                <span style={{ fontSize: 12, color: 'var(--text3)' }}>
+                  Período que se muestra en el Dashboard
+                </span>
+              </div>
             </div>
           </div>
 
