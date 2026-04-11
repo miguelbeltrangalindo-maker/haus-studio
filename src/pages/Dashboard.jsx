@@ -49,12 +49,26 @@ export default function Dashboard(props) {
     .filter(s => s.fecha === tomorrow && !['Cancelada', 'No show'].includes(s.estatus))
     .sort((a, b) => a.hora > b.hora ? 1 : -1)
 
+  // Featured session: in-session now, or next upcoming today
+  const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes()
+  const featuredSession = (() => {
+    const candidates = sessions
+      .filter(s => s.fecha === today && ['Reservada', 'Confirmada', 'Llegó', 'En sesión'].includes(s.estatus))
+      .sort((a, b) => (a.hora || '') > (b.hora || '') ? 1 : -1)
+    const enSesion = candidates.find(s => s.estatus === 'En sesión')
+    if (enSesion) return enSesion
+    return candidates.find(s => {
+      const [h, m] = (s.hora || '00:00').split(':').map(Number)
+      return (h * 60 + m) >= nowMinutes - 15
+    }) || null
+  })()
+
   const metrics = {
     rangeLabel, totalSessions,
     confirmadas, pendEntrega, pendPago,
     entregadas, canceladas, liquidadas,
     totalLiquidado, totalAnticipo, totalRestante,
-    todaySes, tomorrowSes,
+    todaySes, tomorrowSes, featuredSession,
   }
 
   return isMobile

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { initials } from '../lib/utils'
+import { initials, statusClass } from '../lib/utils'
 import Badge from '../components/Badge'
 import SessionModal from '../components/SessionModal'
 import { useToast } from '../hooks/useToast'
@@ -14,11 +14,23 @@ export default function DashboardMobile({
   rangeLabel, totalSessions,
   confirmadas, pendEntrega, pendPago, entregadas, canceladas, liquidadas,
   totalLiquidado, totalAnticipo, totalRestante,
-  todaySes, tomorrowSes,
+  todaySes, tomorrowSes, featuredSession,
 }) {
   const toast    = useToast()
   const navigate = useNavigate()
   const [modal, setModal] = useState(false)
+
+  const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes()
+  const featuredEta = (() => {
+    if (!featuredSession) return null
+    if (featuredSession.estatus === 'En sesión') return 'EN SESIÓN · AHORA'
+    const [h, m] = (featuredSession.hora || '00:00').split(':').map(Number)
+    const diff = (h * 60 + m) - nowMinutes
+    if (diff <= 0) return 'LLEGANDO'
+    if (diff < 60) return `EN ${diff} MIN`
+    const hrs = Math.floor(diff / 60); const mins = diff % 60
+    return `EN ${hrs}H${mins > 0 ? ` ${mins}MIN` : ''}`
+  })()
 
   const handleCreate = async (form) => {
     const { error } = await createSession(form)
@@ -71,6 +83,36 @@ export default function DashboardMobile({
           </div>
         )}
       </div>
+
+      {/* Featured / Next session */}
+      {featuredSession && (
+        <div style={{ padding: '0 16px 4px' }}>
+          <div
+            className={`nsc ${statusClass(featuredSession.estatus)}`}
+            onClick={() => navigate('/hoy')}
+          >
+            {featuredEta && <div className="nsc-eta">{featuredEta}</div>}
+            <div className="nsc-row">
+              <div className="nsc-name">{featuredSession.nombre}</div>
+              <Badge status={featuredSession.estatus} />
+            </div>
+            <div className="nsc-meta">
+              {featuredSession.hora?.slice(0, 5)}
+              {' · '}{featuredSession.personas} {featuredSession.personas === 1 ? 'persona' : 'personas'}
+            </div>
+            {(+featuredSession.anticipo > 0 || +featuredSession.restante > 0) && (
+              <div className="nsc-money">
+                {+featuredSession.anticipo > 0 && (
+                  <span className="nsc-anticipo">${(+featuredSession.anticipo).toLocaleString()} anticipo</span>
+                )}
+                {+featuredSession.restante > 0 && (
+                  <span className="nsc-restante">${(+featuredSession.restante).toLocaleString()} saldo</span>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* KPI strip — 2 cols via CSS breakpoint */}
       <div className="dash-kpis">

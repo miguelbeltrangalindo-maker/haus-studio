@@ -4,6 +4,7 @@ import { es } from 'date-fns/locale'
 import { getTimeSlots, statusClass, weekDays, fmtDate, todayStr } from '../lib/utils'
 import { useConfig } from '../hooks/useConfig'
 import { useToast } from '../hooks/useToast'
+import Badge from '../components/Badge'
 import SessionModal from '../components/SessionModal'
 
 export default function Agenda({ sessions, createSession, updateSession, onSelectSession }) {
@@ -76,84 +77,143 @@ export default function Agenda({ sessions, createSession, updateSession, onSelec
   // ── Day view (timeline) ──
   const DayView = () => {
     const dateStr = format(current, 'yyyy-MM-dd')
-    const isToday = dateStr === todayS
-
+    const isToday  = dateStr === todayS
     const nowMinutes = isToday ? new Date().getHours() * 60 + new Date().getMinutes() : null
-    const [openH, openM] = (config.open_time || '09:00').split(':').map(Number)
-    const openMinutes = openH * 60 + openM
+    const blockDur   = config.block_minutes || 30
 
-    // Daily summary metrics
-    const dayActive = sessions.filter(s => s.fecha === dateStr && !['Cancelada', 'No show'].includes(s.estatus))
-    const dayCount   = dayActive.length
+    // Daily metrics
+    const dayActive   = sessions.filter(s => s.fecha === dateStr && !['Cancelada', 'No show'].includes(s.estatus))
     const dayAnticipo = dayActive.reduce((a, s) => a + (+s.anticipo || 0), 0)
     const dayRestante = dayActive.reduce((a, s) => a + (+s.restante || 0), 0)
 
+    // Featured: in-session first, then next upcoming today
+    const upcomingOrActive = dayActive
+      .filter(s => ['Reservada', 'Confirmada', 'Llegó', 'En sesión'].includes(s.estatus))
+      .sort((a, b) => (a.hora || '') > (b.hora || '') ? 1 : -1)
+
+    const featuredSes = (() => {
+      const enSesion = upcomingOrActive.find(s => s.estatus === 'En sesión')
+      if (enSesion) return enSesion
+      if (!isToday || nowMinutes === null) return upcomingOrActive[0] || null
+      return upcomingOrActive.find(s => {
+        const [h, m] = (s.hora || '00:00').split(':').map(Number)
+        return (h * 60 + m) >= nowMinutes - 15
+      }) || null
+    })()
+
+    const etaLabel = (() => {
+      if (!featuredSes || !isToday || nowMinutes === null) return null
+      if (featuredSes.estatus === 'En sesión') return 'EN SESIÓN · AHORA'
+      const [h, m] = (featuredSes.hora || '00:00').split(':').map(Number)
+      const diff = (h * 60 + m) - nowMinutes
+      if (diff <= 0) return 'LLEGANDO'
+      if (diff < 60) return `EN ${diff} MIN`
+      const hrs = Math.floor(diff / 60)
+      const mins = diff % 60
+      return `EN ${hrs}H${mins > 0 ? ` ${mins}MIN` : ''}`
+    })()
+
     return (
       <>
-        {dayCount > 0 && (
-          <div className="daily-summary">
-            <div className="ds-item">
-              <div className="ds-label">Sesiones</div>
-              <div className="ds-value">{dayCount}</div>
+        {/* Day metrics header */}
+        {dayActive.length > 0 && (
+          <div className="day-header-v2">
+            <div className="dhv2-item">
+              <div className="dhv2-value">{dayActive.length}</div>
+              <div className="dhv2-label">sesiones</div>
             </div>
             {dayAnticipo > 0 && (
-              <div className="ds-item">
-                <div className="ds-label">Anticipos</div>
-                <div className="ds-value green">${dayAnticipo.toLocaleString()}</div>
+              <div className="dhv2-item">
+                <div className="dhv2-value green">${dayAnticipo.toLocaleString()}</div>
+                <div className="dhv2-label">cobrado</div>
               </div>
             )}
             {dayRestante > 0 && (
-              <div className="ds-item">
-                <div className="ds-label">Por cobrar</div>
-                <div className="ds-value amber">${dayRestante.toLocaleString()}</div>
+              <div className="dhv2-item">
+                <div className="dhv2-value amber">${dayRestante.toLocaleString()}</div>
+                <div className="dhv2-label">pendiente</div>
               </div>
             )}
           </div>
         )}
 
-        <div className="timeline">
+        {/* Featured / Next session card */}
+        {featuredSes && (
+          <div
+            className={`nsc ${statusClass(featuredSes.estatus)}`}
+            onClick={() => handleSessionClick(featuredSes)}
+          >
+            {etaLabel && <div className="nsc-eta">{etaLabel}</div>}
+            <div className="nsc-row">
+              <div className="nsc-name">{featuredSes.nombre}</div>
+              <Badge status={featuredSes.estatus} />
+            </div>
+            <div className="nsc-meta">
+              {featuredSes.hora?.slice(0, 5)}
+              {' · '}{featuredSes.personas} {featuredSes.personas === 1 ? 'persona' : 'personas'}
+              {featuredSes.telefono && ` · ${featuredSes.telefono}`}
+            </div>
+            {(+featuredSes.anticipo > 0 || +featuredSes.restante > 0) && (
+              <div className="nsc-money">
+                {+featuredSes.anticipo > 0 && (
+                  <span className="nsc-anticipo">${(+featuredSes.anticipo).toLocaleString()} anticipo</span>
+                )}
+                {+featuredSes.restante > 0 && (
+                  <span className="nsc-restante">${(+featuredSes.restante).toLocaleString()} saldo</span>
+                )}
+              </div>
+            )}
+            {featuredSes.notas && <div className="nsc-notes">{featuredSes.notas}</div>}
+          </div>
+        )}
+
+        {/* Timeline */}
+        <div className="tl-timeline">
           {slots.map(slot => {
             const [h, m] = slot.split(':').map(Number)
-            const slotMinutes = h * 60 + m
-            const isHourStart = m === 0
+            const slotMinutes  = h * 60 + m
+            const isHourStart  = m === 0
             const slotSessions = getSessionsAt(dateStr, slot)
-            const showNow = nowMinutes !== null &&
-              nowMinutes >= slotMinutes &&
-              nowMinutes < slotMinutes + (config.block_minutes || 30)
+            const isPast    = nowMinutes !== null && slotMinutes + blockDur <= nowMinutes
+            const isNowSlot = nowMinutes !== null && nowMinutes >= slotMinutes && nowMinutes < slotMinutes + blockDur
 
             return (
-              <div key={slot} className={`timeline-slot${isHourStart ? ' hour-start' : ''}`}>
-                <div className="timeline-time">{slot}</div>
+              <div
+                key={slot}
+                className={`tl-row${isHourStart ? ' hour-start' : ''}${isPast && slotSessions.length === 0 ? ' past-empty' : ''}`}
+              >
+                <div className={`tl-time${isHourStart ? ' hour' : ''}${isPast ? ' past' : ''}`}>{slot}</div>
                 <div
-                  className="timeline-body"
+                  className="tl-body"
                   onClick={() => slotSessions.length === 0 && openNew(dateStr, slot)}
                 >
-                  {showNow && <div className="timeline-now" />}
+                  {isNowSlot && slotSessions.length === 0 && <div className="tl-now-line" />}
+                  {slotSessions.length === 0 && !isNowSlot && <div className="tl-empty-hint">+</div>}
                   {slotSessions.map(ses => (
                     <div
                       key={ses.id}
-                      className={`timeline-session ${statusClass(ses.estatus)}`}
+                      className={`tl-session ${statusClass(ses.estatus)}${isPast && !['En sesión', 'Llegó'].includes(ses.estatus) ? ' past' : ''}`}
                       onClick={e => { e.stopPropagation(); handleSessionClick(ses) }}
                     >
-                      <div className="timeline-session-header">
-                        <div className="timeline-session-name">{ses.nombre}</div>
-                        <div className="timeline-session-meta">
-                          {ses.personas} {ses.personas === 1 ? 'persona' : 'personas'} · {ses.estatus}
-                        </div>
+                      <div className="tl-ses-row">
+                        <div className="tl-ses-name">{ses.nombre}</div>
+                        <Badge status={ses.estatus} />
                       </div>
-                      {ses.notas && (
-                        <div className="timeline-session-notes">{ses.notas}</div>
-                      )}
+                      <div className="tl-ses-meta">
+                        {ses.personas} {ses.personas === 1 ? 'persona' : 'personas'}
+                        {ses.telefono && ` · ${ses.telefono}`}
+                      </div>
                       {(+ses.anticipo > 0 || +ses.restante > 0) && (
-                        <div className="timeline-session-money">
+                        <div className="tl-ses-money">
                           {+ses.anticipo > 0 && (
-                            <span className="tsm-anticipo">${(+ses.anticipo).toLocaleString()} ant.</span>
+                            <span className="tl-anticipo">${(+ses.anticipo).toLocaleString()} ant.</span>
                           )}
                           {+ses.restante > 0 && (
-                            <span className="tsm-restante">${(+ses.restante).toLocaleString()} saldo</span>
+                            <span className="tl-restante">${(+ses.restante).toLocaleString()} saldo</span>
                           )}
                         </div>
                       )}
+                      {ses.notas && <div className="tl-ses-notes">{ses.notas}</div>}
                     </div>
                   ))}
                 </div>
