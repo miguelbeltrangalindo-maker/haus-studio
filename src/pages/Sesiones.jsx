@@ -36,7 +36,7 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
     if (quick === 'manana')    list = list.filter(s => s.fecha === tomorrowStr())
     if (quick === 'en-sesion') list = list.filter(s => s.estatus === 'En sesión')
     if (quick === 'pendiente') list = list.filter(s => s.estatus === 'Pendiente de entrega')
-    if (quick === 'pago')      list = list.filter(s => s.estatus === 'Pendiente de pago')
+    if (quick === 'pago')      list = list.filter(s => +s.restante > 0)
     if (quick === 'entregada') list = list.filter(s => s.estatus === 'Entregada')
     if (quick === 'cancelada') list = list.filter(s => s.estatus === 'Cancelada')
     return list.sort((a, b) => (a.fecha + (a.hora || '')) < (b.fecha + (b.hora || '')) ? 1 : -1)
