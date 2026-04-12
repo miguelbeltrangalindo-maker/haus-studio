@@ -148,11 +148,16 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
                       <div className="session-card-meta">
                         {fmtDate(s.fecha)} · {s.hora?.slice(0, 5)} · {s.personas} {s.personas === 1 ? 'persona' : 'personas'}
                       </div>
-                      {((+s.anticipo > 0) || (+s.restante > 0)) && (
+                      {((+s.anticipo > 0) || (+s.restante > 0) || (+s.pagos > 0)) && (
                         <div className="session-card-money">
                           {+s.anticipo > 0 && (
                             <span style={{ color: 'var(--green)' }}>
                               ${(+s.anticipo).toLocaleString()} ant.
+                            </span>
+                          )}
+                          {+s.pagos > 0 && (
+                            <span style={{ color: 'var(--green)' }}>
+                              ${(+s.pagos).toLocaleString()} cobrado
                             </span>
                           )}
                           {+s.restante > 0 && (
