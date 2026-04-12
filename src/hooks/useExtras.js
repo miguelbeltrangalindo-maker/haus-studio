@@ -11,7 +11,15 @@ export function useExtras() {
       .select('*')
       .order('created_at', { ascending: true })
     if (error) {
-      if (error.code === '42P01') setTableError(true)
+      if (error.code === '42P01') { setTableError(true); return }
+      // Schema cache stale after ALTER TABLE — retry once with a delay
+      if (error.message?.includes('schema cache') || error.message?.includes('column')) {
+        setTimeout(async () => {
+          const { data: d2, error: e2 } = await supabase
+            .from('session_extras').select('*').order('created_at', { ascending: true })
+          if (!e2) setExtras(d2 || [])
+        }, 1500)
+      }
       return
     }
     setExtras(data || [])
