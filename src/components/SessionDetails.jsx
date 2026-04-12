@@ -15,7 +15,7 @@ const METHOD_LABEL = { efectivo: 'Efectivo', transferencia: 'Transferencia', tar
 
 const EXTRA_PRESETS = ['Personas adicionales', 'Galería web', 'Impresiones', 'Álbum', 'Otro']
 
-export default function SessionDetails({ session, onClose, updateSession, sessionPagos = [], createPago, sessionExtras = [], createExtra, deleteExtra }) {
+export default function SessionDetails({ session, onClose, updateSession, deleteSession, sessionPagos = [], createPago, sessionExtras = [], createExtra, deleteExtra }) {
   const { config } = useConfig()
   const toast = useToast()
   const [editOpen, setEditOpen]     = useState(false)
@@ -118,6 +118,13 @@ export default function SessionDetails({ session, onClose, updateSession, sessio
     if (!confirm('¿Cancelar esta sesión?')) return
     await updateSession(session.id, { estatus: 'Cancelada' })
     toast('Sesión cancelada')
+    onClose()
+  }
+
+  const handleDeletePermanent = async () => {
+    if (!confirm(`¿Eliminar permanentemente la sesión de ${session.nombre}?\n\nSe borrarán todos los pagos y cargos asociados. Esta acción no se puede deshacer.`)) return
+    await deleteSession(session.id)
+    toast('Sesión eliminada', 'success')
     onClose()
   }
 
@@ -395,6 +402,15 @@ export default function SessionDetails({ session, onClose, updateSession, sessio
           <button className="btn btn-danger btn-sm" onClick={handleDelete} style={{ width: '100%' }}>
             Cancelar sesión
           </button>
+          {deleteSession && (
+            <button
+              className="btn btn-sm"
+              onClick={handleDeletePermanent}
+              style={{ width: '100%', color: 'var(--red)', borderColor: 'var(--red)', marginTop: 2 }}
+            >
+              Eliminar permanentemente
+            </button>
+          )}
         </div>
 
       </aside>

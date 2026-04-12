@@ -54,6 +54,7 @@ function AppInner() {
           session={currentSelected}
           onClose={() => setSelectedId(null)}
           updateSession={updateSession}
+          deleteSession={deleteSession}
           sessionPagos={pagos.filter(p => p.session_id === currentSelected?.id)}
           createPago={createPago}
           sessionExtras={extras.filter(e => e.session_id === currentSelected?.id)}
