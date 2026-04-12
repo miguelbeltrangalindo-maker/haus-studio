@@ -80,7 +80,8 @@ export default function SessionDetails({ session, onClose, updateSession, delete
   }
 
   const handleDeleteExtra = async (extra) => {
-    if (!confirm(`¿Eliminar "${extra.concepto}"?`)) return
+    const qty = extra.cantidad > 1 ? ` ×${extra.cantidad}` : ''
+    if (!confirm(`¿Estás seguro de eliminar el cargo "${extra.concepto}${qty}" por $${(+extra.monto).toLocaleString()}?\n\nEste monto se descontará del saldo pendiente.`)) return
     await deleteExtra(extra.id)
     const newRestante = Math.max(0, (+session.restante || 0) - (+extra.monto || 0))
     await updateSession(session.id, { restante: String(newRestante) })
