@@ -13,7 +13,7 @@ const METHODS = [
 
 const METHOD_LABEL = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta' }
 
-export default function SessionDetails({ session, onClose, updateSession, deleteSession, sessionPagos = [], createPago, sessionExtras = [], createExtra, updateExtra, deleteExtra }) {
+export default function SessionDetails({ session, onClose, updateSession, deleteSession, sessionPagos = [], createPago, sessionExtras = [], createExtra, deleteExtra }) {
   const { config } = useConfig()
   const toast = useToast()
   const [editOpen, setEditOpen]   = useState(false)
@@ -23,8 +23,6 @@ export default function SessionDetails({ session, onClose, updateSession, delete
   const [paying, setPaying]       = useState(false)
   const [extraQtys, setExtraQtys]           = useState({})
   const [applyingExtras, setApplyingExtras] = useState(false)
-  const [editingExtra, setEditingExtra]     = useState(null) // { id, concepto, monto, cantidad }
-  const [savingExtra, setSavingExtra]       = useState(false)
   const [descuento, setDescuento]           = useState('')
   const [applyingDesc, setApplyingDesc]     = useState(false)
 
@@ -112,30 +110,6 @@ export default function SessionDetails({ session, onClose, updateSession, delete
     toast(`$${totalMonto.toLocaleString()} en cargos agregados`, 'success')
     setExtraQtys({})
     setApplyingExtras(false)
-  }
-
-  const handleUpdateExtra = async () => {
-    if (!editingExtra) return
-    const original = sessionExtras.find(e => e.id === editingExtra.id)
-    if (!original) return
-    const newMonto = +(editingExtra.monto) || 0
-    const newCantidad = +(editingExtra.cantidad) || 1
-    if (newMonto <= 0) { toast('El monto debe ser mayor a 0', 'error'); return }
-    setSavingExtra(true)
-    const result = await updateExtra(editingExtra.id, {
-      concepto: editingExtra.concepto,
-      monto: newMonto,
-      cantidad: newCantidad,
-    })
-    if (result.error) { toast(result.error, 'error'); setSavingExtra(false); return }
-    // Adjust restante by the difference
-    const diff = newMonto - (+original.monto || 0)
-    if (diff !== 0) {
-      await updateSession(session.id, { restante: String(Math.max(0, (+session.restante || 0) + diff)) })
-    }
-    toast('Cargo actualizado', 'success')
-    setEditingExtra(null)
-    setSavingExtra(false)
   }
 
   const handleDeleteExtra = async (extra) => {
@@ -283,68 +257,20 @@ export default function SessionDetails({ session, onClose, updateSession, delete
             <div className="dp-section-label">Cargos adicionales</div>
 
             {/* Applied extras */}
-            {sessionExtras.map(e => {
-              const isEditing = editingExtra?.id === e.id
-              if (isEditing) {
-                return (
-                  <div key={e.id} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px', marginBottom: 6, background: 'var(--bg2)' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <input
-                        className="form-input"
-                        style={{ fontSize: 13, padding: '5px 10px' }}
-                        value={editingExtra.concepto}
-                        onChange={ev => setEditingExtra(x => ({ ...x, concepto: ev.target.value }))}
-                        placeholder="Concepto"
-                      />
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 3 }}>Cantidad</div>
-                          <input className="form-input" type="number" min="1" max="99"
-                            style={{ fontSize: 13, padding: '5px 10px' }}
-                            value={editingExtra.cantidad}
-                            onChange={ev => setEditingExtra(x => ({ ...x, cantidad: ev.target.value }))} />
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 3 }}>Monto total ($)</div>
-                          <input className="form-input" type="number" min="0"
-                            style={{ fontSize: 13, padding: '5px 10px' }}
-                            value={editingExtra.monto}
-                            onChange={ev => setEditingExtra(x => ({ ...x, monto: ev.target.value }))} />
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <button className="btn btn-primary btn-sm" onClick={handleUpdateExtra} disabled={savingExtra} style={{ flex: 1 }}>
-                          {savingExtra ? '…' : 'Guardar'}
-                        </button>
-                        <button className="btn btn-ghost btn-sm" onClick={() => setEditingExtra(null)} style={{ flex: 1 }}>
-                          Cancelar
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )
-              }
-              return (
-                <div key={e.id} className="dp-meta-row">
-                  <span className="dp-meta-label">
-                    {e.concepto}{(e.cantidad > 1) ? ` ×${e.cantidad}` : ''}
-                  </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span className="dp-meta-value" style={{ color: 'var(--amber-l)' }}>+${(+e.monto).toLocaleString()}</span>
-                    {updateExtra && (
-                      <button onClick={() => setEditingExtra({ id: e.id, concepto: e.concepto, monto: e.monto, cantidad: e.cantidad || 1 })}
-                        title="Editar"
-                        style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 13, lineHeight: 1, padding: 0 }}>✎</button>
-                    )}
-                    {deleteExtra && (
-                      <button onClick={() => handleDeleteExtra(e)}
-                        title="Eliminar"
-                        style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0 }}>×</button>
-                    )}
-                  </span>
-                </div>
-              )
-            })}
+            {sessionExtras.map(e => (
+              <div key={e.id} className="dp-meta-row">
+                <span className="dp-meta-label">
+                  {e.concepto}{(e.cantidad > 1) ? ` ×${e.cantidad}` : ''}
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className="dp-meta-value" style={{ color: 'var(--amber-l)' }}>+${(+e.monto).toLocaleString()}</span>
+                  {deleteExtra && (
+                    <button onClick={() => handleDeleteExtra(e)}
+                      style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0 }}>×</button>
+                  )}
+                </span>
+              </div>
+            ))}
 
             {/* Quantity pickers from config */}
             {conceptos.length > 0 ? (

@@ -11,6 +11,7 @@ export default function Config() {
   const [newConcepto, setNewConcepto] = useState('')
   const [newPrecio, setNewPrecio]     = useState('')
   const [addingC, setAddingC]         = useState(false)
+  const [editingPrices, setEditingPrices] = useState({}) // { [id]: precio_string }
 
   useEffect(() => { setForm(config) }, [config])
 
@@ -28,7 +29,24 @@ export default function Config() {
     setAddingC(false)
   }
 
+  const handlePriceChange = (id, value) => {
+    setEditingPrices(p => ({ ...p, [id]: value }))
+    const parsed = +value
+    if (parsed > 0) {
+      set('extra_conceptos', conceptos.map(c => c.id === id ? { ...c, precio_unitario: parsed } : c))
+    }
+  }
+
   const handleRemoveConcepto = (id) => {
+    const concepto = conceptos.find(c => c.id === id)
+    const primera = confirm(
+      `¿Eliminar el concepto "${concepto?.nombre}"?\n\nATENCIÓN: Si este cargo ya fue aplicado a sesiones, los saldos de esas sesiones no se ajustarán automáticamente y quedarán descuadrados.`
+    )
+    if (!primera) return
+    const segunda = confirm(
+      `Confirma nuevamente: al eliminar "${concepto?.nombre}" las reglas lógicas del sistema pueden verse afectadas y los saldos existentes no cuadrarán.\n\n¿Continuar de todas formas?`
+    )
+    if (!segunda) return
     set('extra_conceptos', conceptos.filter(c => c.id !== id))
   }
 
@@ -176,16 +194,27 @@ export default function Config() {
             {conceptos.length > 0 && (
               <div className="card" style={{ padding: '10px 16px', marginBottom: 12 }}>
                 {conceptos.map(c => (
-                  <div key={c.id} className="dp-meta-row" style={{ paddingBlock: 8 }}>
-                    <span className="dp-meta-label" style={{ fontWeight: 500 }}>{c.nombre}</span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <span style={{ fontSize: 13, color: 'var(--text2)' }}>${(+c.precio_unitario).toLocaleString()} / u</span>
-                      <button
-                        onClick={() => handleRemoveConcepto(c.id)}
-                        style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0 }}
-                        title="Eliminar"
-                      >×</button>
-                    </span>
+                  <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 12, paddingBlock: 8, borderBottom: '1px solid var(--border)' }}
+                    className="dp-meta-row">
+                    <span style={{ flex: 1, fontWeight: 500, fontSize: 14 }}>{c.nombre}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 12, color: 'var(--text3)' }}>$</span>
+                      <input
+                        className="form-input"
+                        type="number"
+                        min="1"
+                        value={editingPrices[c.id] ?? c.precio_unitario}
+                        onChange={e => handlePriceChange(c.id, e.target.value)}
+                        style={{ width: 90, padding: '4px 8px', fontSize: 13, textAlign: 'right' }}
+                        title="Precio por unidad"
+                      />
+                      <span style={{ fontSize: 12, color: 'var(--text3)', whiteSpace: 'nowrap' }}>/ u</span>
+                    </div>
+                    <button
+                      onClick={() => handleRemoveConcepto(c.id)}
+                      style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0, flexShrink: 0 }}
+                      title="Eliminar"
+                    >×</button>
                   </div>
                 ))}
               </div>
