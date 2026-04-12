@@ -54,6 +54,19 @@ export function useExtras() {
     return { data }
   }
 
+  const updateExtra = async (id, updates) => {
+    if (tableError) return { error: 'Tabla no disponible' }
+    const { data, error } = await supabase
+      .from('session_extras')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) return { error: error.message }
+    setExtras(prev => prev.map(e => e.id === id ? data : e))
+    return { data }
+  }
+
   const deleteExtra = async (id) => {
     if (tableError) return { error: 'Tabla no disponible' }
     const { error } = await supabase.from('session_extras').delete().eq('id', id)
@@ -62,5 +75,5 @@ export function useExtras() {
     return {}
   }
 
-  return { extras, tableError, createExtra, deleteExtra, fetch }
+  return { extras, tableError, createExtra, updateExtra, deleteExtra, fetch }
 }

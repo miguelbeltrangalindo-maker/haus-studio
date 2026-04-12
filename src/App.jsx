@@ -20,7 +20,7 @@ function AppInner() {
   const { sessions, loading, createSession, updateSession, deleteSession, fetch } = useSessions()
   const { gastos, loading: gastosLoading, tableError, createGasto, deleteGasto } = useGastos()
   const { pagos, createPago } = usePagos()
-  const { extras, createExtra, deleteExtra, tableError: extrasTableError } = useExtras()
+  const { extras, createExtra, updateExtra, deleteExtra, tableError: extrasTableError } = useExtras()
   const { config } = useConfig()
   const [selectedId, setSelectedId] = useState(null)
   const location = useLocation()
@@ -79,6 +79,7 @@ function AppInner() {
           createPago={createPago}
           sessionExtras={extras.filter(e => e.session_id === currentSelected?.id)}
           createExtra={createExtra}
+          updateExtra={updateExtra}
           deleteExtra={deleteExtra}
         />
       )}
