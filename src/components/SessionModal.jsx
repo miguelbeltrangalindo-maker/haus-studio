@@ -29,6 +29,7 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
     anticipo: '',
     metodo_anticipo: '',
     restante: '',
+    descuento: '',
     metodo_pago: '',
     pagos: 0,
     notas: '',
@@ -186,6 +187,23 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
             <label className="form-label">Saldo pendiente ($)</label>
             <input className="form-input" type="number" min="0" value={form.restante}
               onChange={e => set('restante', e.target.value)} placeholder="0" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Descuento ($)</label>
+            <input className="form-input" type="number" min="0"
+              value={form.descuento || ''}
+              onChange={e => {
+                const desc = +e.target.value || 0
+                const restante = +form.restante || 0
+                if (desc > restante) { set('descuento', restante); return }
+                set('descuento', e.target.value)
+              }}
+              placeholder="0" />
+            {(+form.descuento > 0) && (
+              <div style={{ fontSize: 12, color: 'var(--green-l)', marginTop: 4 }}>
+                Saldo después del descuento: ${Math.max(0, (+form.restante || 0) - (+form.descuento || 0)).toLocaleString()}
+              </div>
+            )}
           </div>
           {form.metodo_pago && (
             <div className="form-group">

@@ -21,8 +21,10 @@ export default function SessionDetails({ session, onClose, updateSession, delete
   const [payAmount, setPayAmount] = useState('')
   const [payMethod, setPayMethod] = useState('efectivo')
   const [paying, setPaying]       = useState(false)
-  const [extraQtys, setExtraQtys] = useState({})
+  const [extraQtys, setExtraQtys]           = useState({})
   const [applyingExtras, setApplyingExtras] = useState(false)
+  const [descuento, setDescuento]           = useState('')
+  const [applyingDesc, setApplyingDesc]     = useState(false)
 
   if (!session) return null
 
@@ -57,6 +59,23 @@ export default function SessionDetails({ session, onClose, updateSession, delete
     toast(`$${amount.toLocaleString()} cobrado ✓`, 'success')
     setPayAmount('')
     setPaying(false)
+  }
+
+  const handleApplyDescuento = async () => {
+    const monto = +descuento
+    if (!monto || monto <= 0) { toast('Ingresa un monto válido', 'error'); return }
+    const restante = +session.restante || 0
+    if (monto > restante) { toast(`El descuento no puede superar $${restante.toLocaleString()}`, 'error'); return }
+    if (!confirm(`¿Aplicar descuento de $${monto.toLocaleString()}?\n\nEl saldo pendiente pasará de $${restante.toLocaleString()} a $${(restante - monto).toLocaleString()}.`)) return
+    setApplyingDesc(true)
+    const newDesc = (+session.descuento || 0) + monto
+    await updateSession(session.id, {
+      restante: String(restante - monto),
+      descuento: String(newDesc),
+    })
+    toast(`Descuento de $${monto.toLocaleString()} aplicado`, 'success')
+    setDescuento('')
+    setApplyingDesc(false)
   }
 
   const conceptos = config.extra_conceptos || []
@@ -258,6 +277,41 @@ export default function SessionDetails({ session, onClose, updateSession, delete
                 Configura los conceptos en Configuración → Cargos adicionales
               </div>
             )}
+          </div>
+        )}
+
+        {/* Descuento */}
+        {hasPending && (
+          <div className="dp-section">
+            <div className="dp-section-label">Descuento</div>
+            {+session.descuento > 0 && (
+              <div className="dp-meta-row" style={{ marginBottom: 8 }}>
+                <span className="dp-meta-label">Descuento aplicado</span>
+                <span className="dp-meta-value" style={{ color: 'var(--green-l)' }}>
+                  −${(+session.descuento).toLocaleString()}
+                </span>
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                className="form-input"
+                type="number"
+                min="1"
+                max={session.restante}
+                value={descuento}
+                onChange={e => setDescuento(e.target.value)}
+                placeholder={`Máx. $${(+session.restante).toLocaleString()}`}
+                style={{ flex: 1 }}
+              />
+              <button
+                className="btn btn-sm"
+                onClick={handleApplyDescuento}
+                disabled={applyingDesc || !descuento || +descuento <= 0}
+                style={{ whiteSpace: 'nowrap' }}
+              >
+                {applyingDesc ? '…' : 'Aplicar'}
+              </button>
+            </div>
           </div>
         )}
 

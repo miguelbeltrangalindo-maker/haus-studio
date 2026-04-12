@@ -25,7 +25,9 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
   const totalAnticipo  = rangeActive.reduce((a, s) => a + (+s.anticipo || 0), 0)
   const totalRestante  = rangeActive.reduce((a, s) => a + (+s.restante  || 0), 0)
 
-  // Valor real por sesión = anticipo + pagos cobrados + saldo pendiente
+  const totalDescuentos = rangeActive.reduce((a, s) => a + (+s.descuento || 0), 0)
+
+  // Valor real por sesión = anticipo + pagos cobrados + saldo pendiente (descuentos ya aplicados al restante)
   const totalFacturado = rangeActive.reduce((a, s) =>
     a + (+s.anticipo || 0) + (+s.pagos || 0) + (+s.restante || 0), 0)
 
@@ -199,6 +201,7 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
             <Kpi label="Total liquidado"     value={`$${totalLiquidado.toLocaleString()}`}    color="green" />
             <Kpi label="Con saldo pendiente" value={conDeuda.length}                          color={conDeuda.length > 0 ? 'amber' : ''} />
             <Kpi label="% cobrado"           value={`${pctCobrado}%`}                         color={pctCobrado >= 80 ? 'green' : 'amber'} />
+            {totalDescuentos > 0 && <Kpi label="Descuentos aplicados" value={`−$${totalDescuentos.toLocaleString()}`} color="red" />}
           </div>
           {conDeuda.length > 0 && (
             <div className="card" style={{ marginTop: 12, padding: '14px 20px' }}>
