@@ -32,8 +32,14 @@ export default function Estadisticas({ sessions, gastos = [] }) {
   )
   const totalLiquidado = liquidadas.reduce((a, s) => a + (+s.pagos || 0), 0)
 
+  // Cobrado real: sesiones liquidadas → pagos completos; con deuda → solo anticipo
+  const totalCobrado = rangeActive.reduce((a, s) => {
+    const liquidada = +s.restante === 0 || s.restante === '' || s.restante == null
+    return a + (liquidada ? (+s.pagos || +s.anticipo || 0) : (+s.anticipo || 0))
+  }, 0)
+
   const conDeuda = rangeActive.filter(s => +s.restante > 0)
-  const pctCobrado = totalFacturado > 0 ? Math.round((totalAnticipo / totalFacturado) * 100) : 0
+  const pctCobrado = totalFacturado > 0 ? Math.round((totalCobrado / totalFacturado) * 100) : 0
   const tasaCancelacion = rangeSessions.length > 0 ? Math.round((canceladas.length / rangeSessions.length) * 100) : 0
   const promedioValor = rangeActive.length > 0 ? Math.round(totalFacturado / rangeActive.length) : 0
 
@@ -47,8 +53,8 @@ export default function Estadisticas({ sessions, gastos = [] }) {
   const catEntries = Object.entries(gastosPorCat).sort((a, b) => b[1] - a[1])
 
   // ── Balance ──
-  const balanceNeto = totalAnticipo - totalGastos
-  const maxBar = Math.max(totalAnticipo, totalGastos, 1)
+  const balanceNeto = totalCobrado - totalGastos
+  const maxBar = Math.max(totalCobrado, totalGastos, 1)
 
   // ── Opportunity ──
   let totalDias = 1, diasConSesion = 0, diasLibres = 0, ocupacion = 0
@@ -92,7 +98,7 @@ export default function Estadisticas({ sessions, gastos = [] }) {
         <div className="stats-block">
           <div className="section-title">Balance financiero</div>
           <div className="stat-kpis">
-            <Kpi label="Anticipos cobrados"  value={`$${totalAnticipo.toLocaleString()}`}  color="green" />
+            <Kpi label="Cobrado"              value={`$${totalCobrado.toLocaleString()}`}   color="green" />
             <Kpi label="Saldo por cobrar"     value={`$${totalRestante.toLocaleString()}`}   color="amber" />
             <Kpi label="Total facturado"      value={`$${totalFacturado.toLocaleString()}`}  />
             <Kpi label="Gastos registrados"   value={`$${totalGastos.toLocaleString()}`}     color="red" />
@@ -102,9 +108,9 @@ export default function Estadisticas({ sessions, gastos = [] }) {
             <div className="bvs-row">
               <span className="bvs-label">Cobrado</span>
               <div className="bvs-track">
-                <div className="bvs-bar green" style={{ width: `${Math.round((totalAnticipo / maxBar) * 100)}%` }} />
+                <div className="bvs-bar green" style={{ width: `${Math.round((totalCobrado / maxBar) * 100)}%` }} />
               </div>
-              <span className="bvs-amount green">${totalAnticipo.toLocaleString()}</span>
+              <span className="bvs-amount green">${totalCobrado.toLocaleString()}</span>
             </div>
             <div className="bvs-row">
               <span className="bvs-label">Gastos</span>
