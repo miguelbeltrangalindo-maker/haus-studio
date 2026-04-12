@@ -72,6 +72,9 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
     if (form.metodo_anticipo === 'cupon' && !(+form.anticipo > 0)) {
       toast('Ingresa el costo de sesión cubierto por el cupón', 'error'); return
     }
+    if (form.metodo_anticipo === 'cupon' && !form.notas.trim()) {
+      toast('Las notas internas son obligatorias al usar cupón (indica el tipo)', 'error'); return
+    }
     const toNum = v => (v === '' || v == null) ? null : +v
     const payload = {
       ...form,
@@ -314,10 +317,17 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
         <div className="modal-section-title">Notas y entrega</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div className="form-group">
-            <label className="form-label">Notas internas</label>
+            <label className="form-label">
+              Notas internas{form.metodo_anticipo === 'cupon' ? ' *' : ''}
+            </label>
             <textarea className="form-input" value={form.notas}
               onChange={e => set('notas', e.target.value)}
-              placeholder="Trae bebé, quiere foto familiar, liquidar en efectivo…" />
+              placeholder={form.metodo_anticipo === 'cupon'
+                ? 'Tipo de Cupón: '
+                : 'Trae bebé, quiere foto familiar, liquidar en efectivo…'}
+              style={form.metodo_anticipo === 'cupon' && !form.notas.trim()
+                ? { borderColor: 'var(--amber)', boxShadow: '0 0 0 2px color-mix(in srgb, var(--amber) 20%, transparent)' }
+                : {}} />
           </div>
           <div className="form-group">
             <label className="form-label">Vínculo de entrega</label>
