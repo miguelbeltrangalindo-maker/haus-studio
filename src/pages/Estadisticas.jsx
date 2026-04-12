@@ -67,6 +67,12 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
   } catch {}
   const promedioSesionesDia = diasConSesion > 0 ? (rangeActive.length / diasConSesion).toFixed(1) : '0'
 
+  // ── Anticipos por método ──
+  const anticipoEfectivo      = rangeActive.filter(s => s.metodo_anticipo === 'efectivo').reduce((a, s) => a + (+s.anticipo || 0), 0)
+  const anticipoTransferencia = rangeActive.filter(s => s.metodo_anticipo === 'transferencia').reduce((a, s) => a + (+s.anticipo || 0), 0)
+  const anticipoSinMetodo     = rangeActive.filter(s => !s.metodo_anticipo && +s.anticipo > 0).reduce((a, s) => a + (+s.anticipo || 0), 0)
+  const maxAnticipo = Math.max(anticipoEfectivo, anticipoTransferencia, anticipoSinMetodo, 1)
+
   // ── Cobros por método ──
   const sessionIdsInRange = new Set(rangeActive.map(s => s.id))
   const rangePagos = pagos.filter(p => sessionIdsInRange.has(p.session_id))
@@ -147,6 +153,34 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
             <div className="bvs-neto" style={{ color: balanceNeto >= 0 ? 'var(--green)' : 'var(--red)' }}>
               Neto: {balanceNeto >= 0 ? '+' : '−'}${Math.abs(balanceNeto).toLocaleString()}
             </div>
+          </div>
+        </div>
+
+        {/* ── Anticipos ── */}
+        <div className="stats-block">
+          <div className="section-title">Anticipos recibidos</div>
+          <div className="stat-kpis">
+            <Kpi label="Total anticipos"   value={`$${totalAnticipo.toLocaleString()}`}          color="green" />
+            <Kpi label="Sesiones con ant." value={rangeActive.filter(s => +s.anticipo > 0).length} />
+            <Kpi label="Efectivo"          value={`$${anticipoEfectivo.toLocaleString()}`}        color={anticipoEfectivo > 0 ? 'green' : ''} />
+            <Kpi label="Transferencia"     value={`$${anticipoTransferencia.toLocaleString()}`}   color={anticipoTransferencia > 0 ? 'green' : ''} />
+          </div>
+          <div className="card" style={{ padding: '14px 20px', marginTop: 12 }}>
+            {[
+              { label: 'Efectivo',      monto: anticipoEfectivo },
+              { label: 'Transferencia', monto: anticipoTransferencia },
+              ...(anticipoSinMetodo > 0 ? [{ label: 'Sin método registrado', monto: anticipoSinMetodo }] : []),
+            ].map(({ label, monto }) => (
+              <div key={label} className="breakdown-row">
+                <div className="breakdown-label">{label}</div>
+                <div className="bvs-track" style={{ flex: 1, margin: '0 12px' }}>
+                  <div className="bvs-bar green" style={{ width: monto > 0 ? `${Math.round((monto / maxAnticipo) * 100)}%` : '0%' }} />
+                </div>
+                <div className={`breakdown-amount${monto > 0 ? ' green' : ''}`} style={{ minWidth: 72, textAlign: 'right', color: monto === 0 ? 'var(--text3)' : undefined }}>
+                  {monto > 0 ? `$${monto.toLocaleString()}` : '—'}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 

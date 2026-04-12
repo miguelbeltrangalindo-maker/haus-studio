@@ -21,7 +21,7 @@ export function useSessions() {
   // Columns added after initial deploy — require ALTER TABLE in Supabase.
   // If the DB doesn't have them yet, we strip & retry so the app doesn't crash.
   // pagos = running total of balance payments collected (not counting anticipo)
-  const OPTIONAL_COLS = ['metodo_pago', 'pagos']
+  const OPTIONAL_COLS = ['metodo_pago', 'pagos', 'metodo_anticipo']
   const stripOptional = (obj) => {
     const out = { ...obj }
     OPTIONAL_COLS.forEach(c => delete out[c])

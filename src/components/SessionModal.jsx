@@ -9,6 +9,10 @@ const METHODS = [
   { key: 'transferencia', label: 'Transferencia' },
   { key: 'tarjeta',       label: 'Tarjeta' },
 ]
+const ANTICIPO_METHODS = [
+  { key: 'efectivo',      label: 'Efectivo' },
+  { key: 'transferencia', label: 'Transferencia' },
+]
 
 export default function SessionModal({ session, prefillDate, prefillHora, onSave, onClose, onDelete }) {
   const { config } = useConfig()
@@ -23,6 +27,7 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
     personas: 1,
     estatus: 'Reservada',
     anticipo: '',
+    metodo_anticipo: '',
     restante: '',
     metodo_pago: '',
     pagos: 0,
@@ -166,13 +171,25 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
               onChange={e => set('anticipo', e.target.value)} placeholder="0" />
           </div>
           <div className="form-group">
+            <label className="form-label">Método del anticipo</label>
+            <div className="method-tabs">
+              {ANTICIPO_METHODS.map(m => (
+                <button key={m.key} type="button"
+                  className={`method-tab ${form.metodo_anticipo === m.key ? 'active' : ''}`}
+                  onClick={() => set('metodo_anticipo', form.metodo_anticipo === m.key ? '' : m.key)}>
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="form-group">
             <label className="form-label">Saldo pendiente ($)</label>
             <input className="form-input" type="number" min="0" value={form.restante}
               onChange={e => set('restante', e.target.value)} placeholder="0" />
           </div>
           {form.metodo_pago && (
             <div className="form-group">
-              <label className="form-label">Último método de pago</label>
+              <label className="form-label">Último método de pago (saldo)</label>
               <input className="form-input" value={
                 form.metodo_pago === 'efectivo' ? 'Efectivo'
                 : form.metodo_pago === 'transferencia' ? 'Transferencia'

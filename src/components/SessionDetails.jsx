@@ -188,9 +188,14 @@ export default function SessionDetails({ session, onClose, updateSession, delete
                 <span className="dp-paid-badge">Liquidada ✓</span>
               </div>
             )}
+            {session.metodo_anticipo && (
+              <div style={{ width: '100%', fontSize: 12, color: 'var(--text3)', marginTop: 2, textTransform: 'capitalize' }}>
+                Anticipo vía {session.metodo_anticipo}
+              </div>
+            )}
             {session.metodo_pago && (
               <div style={{ width: '100%', fontSize: 12, color: 'var(--text3)', marginTop: 2, textTransform: 'capitalize' }}>
-                Pagado con {session.metodo_pago}
+                Saldo cobrado con {session.metodo_pago}
               </div>
             )}
           </div>
