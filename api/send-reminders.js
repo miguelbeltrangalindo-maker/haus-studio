@@ -85,6 +85,7 @@ export default async function handler(req, res) {
       )
 
       const waData = await waRes.json()
+      console.log(`WA response for ${session.nombre} (${phone}):`, JSON.stringify(waData))
 
       if (waRes.ok) {
         await supabase
@@ -93,6 +94,7 @@ export default async function handler(req, res) {
           .eq('id', session.id)
         results.push({ nombre: session.nombre, phone, status: 'sent' })
       } else {
+        console.error(`WA error for ${session.nombre}:`, JSON.stringify(waData))
         results.push({ nombre: session.nombre, phone, status: 'error', detail: waData })
       }
     } catch (err) {
