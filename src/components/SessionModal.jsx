@@ -55,8 +55,16 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
     if (!form.telefono.trim()) { toast('El teléfono es requerido', 'error'); return }
     if (!form.fecha) { toast('La fecha es requerida', 'error'); return }
     if (!form.hora)  { toast('La hora es requerida', 'error'); return }
+    const toNum = v => (v === '' || v == null) ? null : +v
+    const payload = {
+      ...form,
+      anticipo:  toNum(form.anticipo),
+      restante:  toNum(form.restante),
+      descuento: toNum(form.descuento),
+      pagos:     toNum(form.pagos),
+    }
     setSaving(true)
-    await onSave(form)
+    await onSave(payload)
     setSaving(false)
   }
 
