@@ -24,19 +24,20 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
 
   const totalAnticipo  = rangeActive.reduce((a, s) => a + (+s.anticipo || 0), 0)
   const totalRestante  = rangeActive.reduce((a, s) => a + (+s.restante  || 0), 0)
-  const totalFacturado = totalAnticipo + totalRestante
+
+  // Valor real por sesión = anticipo + pagos cobrados + saldo pendiente
+  const totalFacturado = rangeActive.reduce((a, s) =>
+    a + (+s.anticipo || 0) + (+s.pagos || 0) + (+s.restante || 0), 0)
 
   const liquidadas = rangeActive.filter(s =>
     ['Completada', 'Entregada', 'Pendiente de entrega'].includes(s.estatus) &&
     (+s.restante === 0 || s.restante === '' || s.restante == null)
   )
-  const totalLiquidado = liquidadas.reduce((a, s) => a + (+s.pagos || 0), 0)
+  const totalLiquidado = liquidadas.reduce((a, s) => a + (+s.anticipo || 0) + (+s.pagos || 0), 0)
 
-  // Cobrado real: sesiones liquidadas → pagos completos; con deuda → solo anticipo
-  const totalCobrado = rangeActive.reduce((a, s) => {
-    const liquidada = +s.restante === 0 || s.restante === '' || s.restante == null
-    return a + (liquidada ? (+s.pagos || +s.anticipo || 0) : (+s.anticipo || 0))
-  }, 0)
+  // Cobrado real: anticipos + pagos cobrados del saldo
+  const totalCobrado = rangeActive.reduce((a, s) =>
+    a + (+s.anticipo || 0) + (+s.pagos || 0), 0)
 
   const conDeuda = rangeActive.filter(s => +s.restante > 0)
   const pctCobrado = totalFacturado > 0 ? Math.round((totalCobrado / totalFacturado) * 100) : 0
