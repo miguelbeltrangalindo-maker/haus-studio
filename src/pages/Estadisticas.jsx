@@ -3,7 +3,7 @@ import { es } from 'date-fns/locale'
 import { todayStr } from '../lib/utils'
 import { useConfig } from '../hooks/useConfig'
 
-export default function Estadisticas({ sessions, gastos = [], pagos = [], extras = [] }) {
+export default function Estadisticas({ sessions, gastos = [], pagos = [], extras = [], extrasTableError = false }) {
   const { config } = useConfig()
 
   const today = todayStr()
@@ -271,7 +271,23 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
         {/* ── Cargos extras por concepto ── */}
         <div className="stats-block">
           <div className="section-title">Cargos adicionales por concepto</div>
-          {extrasEntries.length > 0 ? (
+          {extrasTableError ? (
+            <div className="card" style={{ padding: '14px 20px' }}>
+              <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 12 }}>
+                Crea la tabla en Supabase → SQL Editor:
+              </p>
+              <pre style={{ fontSize: 11, background: 'var(--bg3)', borderRadius: 8, padding: 12, overflowX: 'auto', color: 'var(--text2)', lineHeight: 1.6 }}>{`create table if not exists session_extras (
+  id         uuid default gen_random_uuid() primary key,
+  session_id uuid not null references sessions(id) on delete cascade,
+  concepto   text not null,
+  monto      numeric(10,2) not null,
+  created_at timestamptz default now()
+);
+alter table session_extras enable row level security;
+create policy "allow_all" on session_extras
+  for all using (true) with check (true);`}</pre>
+            </div>
+          ) : extrasEntries.length > 0 ? (
             <>
               <div className="stat-kpis">
                 <Kpi label="Total cargos extras" value={`$${totalExtras.toLocaleString()}`} color="amber" />

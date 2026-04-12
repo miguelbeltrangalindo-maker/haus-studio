@@ -20,7 +20,7 @@ function AppInner() {
   const { sessions, loading, createSession, updateSession, deleteSession, fetch } = useSessions()
   const { gastos, loading: gastosLoading, tableError, createGasto, deleteGasto } = useGastos()
   const { pagos, createPago } = usePagos()
-  const { extras, createExtra, deleteExtra } = useExtras()
+  const { extras, createExtra, deleteExtra, tableError: extrasTableError } = useExtras()
   const [selectedId, setSelectedId] = useState(null)
   const location = useLocation()
 
@@ -45,7 +45,7 @@ function AppInner() {
           <Route path="/agenda"        element={<Agenda       {...shared} />} />
           <Route path="/sesiones"      element={<Sesiones     {...shared} />} />
           <Route path="/gastos"        element={<Gastos gastos={gastos} loading={gastosLoading} tableError={tableError} createGasto={createGasto} deleteGasto={deleteGasto} />} />
-          <Route path="/estadisticas"  element={<Estadisticas sessions={sessions} gastos={gastos} pagos={pagos} extras={extras} />} />
+          <Route path="/estadisticas"  element={<Estadisticas sessions={sessions} gastos={gastos} pagos={pagos} extras={extras} extrasTableError={extrasTableError} />} />
           <Route path="/config"        element={<Config />} />
         </Routes>
       </main>
