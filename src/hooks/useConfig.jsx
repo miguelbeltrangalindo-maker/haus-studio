@@ -32,10 +32,21 @@ export function ConfigProvider({ children }) {
   const updateConfig = async (updates) => {
     const next = { ...config, ...updates }
     setConfig(next)
-    const { error } = await supabase.from('config').upsert({ id: 1, ...next })
+
+    // Save extra_conceptos with a dedicated call so it's never lost in fallbacks
+    if (updates.extra_conceptos !== undefined) {
+      await supabase.from('config')
+        .update({ extra_conceptos: updates.extra_conceptos })
+        .eq('id', 1)
+    }
+
+    // Save the rest of the config
+    const { extra_conceptos, ...rest } = next
+    const { error } = await supabase.from('config').upsert({ id: 1, ...rest })
     if (error && (error.message.includes('schema cache') || error.message.includes('column') || error.message.includes('does not exist'))) {
-      const { extra_conceptos, ...simple } = next
-      await supabase.from('config').upsert({ id: 1, ...simple })
+      // Strip columns that may not exist yet and retry
+      const { session_minutes, ...safe } = rest
+      await supabase.from('config').upsert({ id: 1, ...safe })
     }
     return next
   }
