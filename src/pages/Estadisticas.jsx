@@ -166,30 +166,41 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [] }) {
         </div>
 
         {/* ── Cobros por método ── */}
-        {rangePagos.length > 0 && (
-          <div className="stats-block">
-            <div className="section-title">Cobros por método de pago</div>
-            <div className="card" style={{ padding: '14px 20px' }}>
-              {METODOS.map(({ key, label }) => {
-                const monto = metodosMap[key] || 0
-                if (!monto) return null
-                return (
-                  <div key={key} className="breakdown-row">
-                    <div className="breakdown-label">{label}</div>
-                    <div className="bvs-track" style={{ flex: 1, margin: '0 12px' }}>
-                      <div className="bvs-bar green" style={{ width: `${Math.round((monto / maxMetodo) * 100)}%` }} />
-                    </div>
-                    <div className="breakdown-amount green">${monto.toLocaleString()}</div>
-                  </div>
-                )
-              })}
-              <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text3)' }}>
-                Total registrado: <strong style={{ color: 'var(--text2)' }}>${rangePagos.reduce((a, p) => a + (+p.monto || 0), 0).toLocaleString()}</strong>
-                {' · '}{rangePagos.length} pago{rangePagos.length !== 1 ? 's' : ''}
-              </div>
-            </div>
+        <div className="stats-block">
+          <div className="section-title">Entradas por método de pago</div>
+          <div className="stat-kpis">
+            {METODOS.map(({ key, label }) => (
+              <Kpi key={key} label={label} value={`$${(metodosMap[key] || 0).toLocaleString()}`} color={(metodosMap[key] || 0) > 0 ? 'green' : ''} />
+            ))}
+            <Kpi label="Total registrado" value={`$${rangePagos.reduce((a, p) => a + (+p.monto || 0), 0).toLocaleString()}`} />
           </div>
-        )}
+          <div className="card" style={{ padding: '14px 20px', marginTop: 12 }}>
+            {METODOS.map(({ key, label }) => {
+              const monto = metodosMap[key] || 0
+              return (
+                <div key={key} className="breakdown-row">
+                  <div className="breakdown-label">{label}</div>
+                  <div className="bvs-track" style={{ flex: 1, margin: '0 12px' }}>
+                    <div className="bvs-bar green" style={{ width: monto > 0 ? `${Math.round((monto / maxMetodo) * 100)}%` : '0%' }} />
+                  </div>
+                  <div className={`breakdown-amount${monto > 0 ? ' green' : ''}`} style={{ minWidth: 72, textAlign: 'right', color: monto === 0 ? 'var(--text3)' : undefined }}>
+                    {monto > 0 ? `$${monto.toLocaleString()}` : '—'}
+                  </div>
+                </div>
+              )
+            })}
+            {rangePagos.length > 0 && (
+              <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text3)' }}>
+                {rangePagos.length} pago{rangePagos.length !== 1 ? 's' : ''} registrado{rangePagos.length !== 1 ? 's' : ''} en el rango
+              </div>
+            )}
+            {rangePagos.length === 0 && (
+              <div style={{ fontSize: 12, color: 'var(--text3)', paddingTop: 4 }}>
+                Los pagos cobrados desde ahora quedarán registrados aquí
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* ── Sesiones ── */}
         <div className="stats-block">
