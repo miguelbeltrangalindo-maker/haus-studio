@@ -10,7 +10,7 @@ import Estadisticas from './pages/Estadisticas'
 import Config from './pages/Config'
 import SessionDetails from './components/SessionDetails'
 import { ToastProvider } from './hooks/useToast'
-import { ConfigProvider } from './hooks/useConfig'
+import { ConfigProvider, useConfig } from './hooks/useConfig'
 import { useSessions } from './hooks/useSessions'
 import { useGastos } from './hooks/useGastos'
 import { usePagos } from './hooks/usePagos'
@@ -21,6 +21,7 @@ function AppInner() {
   const { gastos, loading: gastosLoading, tableError, createGasto, deleteGasto } = useGastos()
   const { pagos, createPago } = usePagos()
   const { extras, createExtra, deleteExtra, tableError: extrasTableError } = useExtras()
+  const { config } = useConfig()
   const [selectedId, setSelectedId] = useState(null)
   const location = useLocation()
 
@@ -33,7 +34,26 @@ function AppInner() {
     if (window.matchMedia('(min-width: 769px)').matches) setSelectedId(ses.id)
   }
 
-  const shared = { sessions, loading, createSession, updateSession, deleteSession, fetch, onSelectSession }
+  // Auto-add "Persona Adicional" extras when personas > 4
+  const createSessionWithExtras = async (form) => {
+    const result = await createSession(form)
+    if (result.error) return result
+    const extra = (+form.personas || 0) - 4
+    if (extra > 0) {
+      const conceptos = config.extra_conceptos || []
+      const concepto = conceptos.find(c =>
+        c.nombre.toLowerCase().replace(/\s+/g, ' ').includes('persona adicional') ||
+        c.nombre.toLowerCase().replace(/\s+/g, ' ').includes('persona')
+      )
+      if (concepto) {
+        const monto = extra * (+concepto.precio_unitario || 0)
+        await createExtra(result.data.id, concepto.nombre, monto, extra, +concepto.precio_unitario || 0)
+      }
+    }
+    return result
+  }
+
+  const shared = { sessions, loading, createSession: createSessionWithExtras, updateSession, deleteSession, fetch, onSelectSession }
 
   return (
     <div className="app">

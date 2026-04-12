@@ -26,6 +26,7 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
     fecha: prefillDate || todayStr(),
     hora: prefillHora || '10:00',
     personas: 1,
+    ninos: 0,
     estatus: 'Reservada',
     anticipo: '',
     metodo_anticipo: '',
@@ -53,7 +54,8 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
 
   const handleSave = async () => {
     if (!form.nombre.trim()) { toast('El nombre es requerido', 'error'); return }
-    if (!form.telefono.trim()) { toast('El teléfono es requerido', 'error'); return }
+    const digits = form.telefono.replace(/\D/g, '')
+    if (digits.length !== 10) { toast('El teléfono debe tener exactamente 10 dígitos', 'error'); return }
     if (!form.fecha) { toast('La fecha es requerida', 'error'); return }
     if (!form.hora)  { toast('La hora es requerida', 'error'); return }
     const hora = form.hora.slice(0, 5)
@@ -158,9 +160,13 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
               onChange={e => set('nombre', e.target.value)} placeholder="Nombre del cliente" />
           </div>
           <div className="form-group">
-            <label className="form-label">Teléfono *</label>
-            <input className="form-input" value={form.telefono}
-              onChange={e => set('telefono', e.target.value)} placeholder="5512345678" />
+            <label className="form-label">
+              Teléfono * <span style={{ fontWeight: 400, color: 'var(--text3)', fontSize: 11 }}>(10 dígitos)</span>
+            </label>
+            <input className="form-input" value={form.telefono} inputMode="numeric"
+              onChange={e => set('telefono', e.target.value.replace(/\D/g, '').slice(0, 10))}
+              placeholder="5512345678"
+              style={form.telefono.length > 0 && form.telefono.length !== 10 ? { borderColor: 'var(--red)' } : {}} />
           </div>
         </div>
 
@@ -178,9 +184,16 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
               onChange={e => set('hora', e.target.value)} step="1800" />
           </div>
           <div className="form-group">
-            <label className="form-label">Personas</label>
+            <label className="form-label">
+              Personas {form.personas > 4 && <span style={{ color: 'var(--amber-l)', fontSize: 11 }}>+{form.personas - 4} cargo extra</span>}
+            </label>
             <input className="form-input" type="number" min="1" max="20" value={form.personas}
               onChange={e => set('personas', +e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Niños menores de 2 años</label>
+            <input className="form-input" type="number" min="0" max="5" value={form.ninos}
+              onChange={e => set('ninos', Math.min(5, Math.max(0, +e.target.value)))} />
           </div>
           <div className="form-group">
             <label className="form-label">Estatus</label>
