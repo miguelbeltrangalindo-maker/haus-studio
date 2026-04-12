@@ -73,14 +73,20 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
   const anticipoSinMetodo     = rangeActive.filter(s => !s.metodo_anticipo && +s.anticipo > 0).reduce((a, s) => a + (+s.anticipo || 0), 0)
   const maxAnticipo = Math.max(anticipoEfectivo, anticipoTransferencia, anticipoSinMetodo, 1)
 
-  // ── Cobros por método ──
+  // ── Cobros por método (session_pagos + anticipos) ──
   const sessionIdsInRange = new Set(rangeActive.map(s => s.id))
   const rangePagos = pagos.filter(p => sessionIdsInRange.has(p.session_id))
+  // Start with pagos del saldo (session_pagos)
   const metodosMap = rangePagos.reduce((acc, p) => {
     const key = p.metodo || 'efectivo'
     acc[key] = (acc[key] || 0) + (+p.monto || 0)
     return acc
   }, {})
+  // Add anticipos by their method
+  rangeActive.forEach(s => {
+    if (!s.metodo_anticipo || !+s.anticipo) return
+    metodosMap[s.metodo_anticipo] = (metodosMap[s.metodo_anticipo] || 0) + (+s.anticipo)
+  })
   const METODOS = [
     { key: 'efectivo',      label: 'Efectivo' },
     { key: 'transferencia', label: 'Transferencia' },
@@ -131,7 +137,7 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
           <div className="stat-kpis">
             <Kpi label="Cobrado"              value={`$${totalCobrado.toLocaleString()}`}   color="green" />
             <Kpi label="Saldo por cobrar"     value={`$${totalRestante.toLocaleString()}`}   color="amber" />
-            <Kpi label="Total facturado"      value={`$${totalFacturado.toLocaleString()}`}  />
+            <Kpi label="Anticipos"             value={`$${totalAnticipo.toLocaleString()}`}   />
             <Kpi label="Gastos registrados"   value={`$${totalGastos.toLocaleString()}`}     color="red" />
           </div>
 
@@ -216,7 +222,7 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
             {METODOS.map(({ key, label }) => (
               <Kpi key={key} label={label} value={`$${(metodosMap[key] || 0).toLocaleString()}`} color={(metodosMap[key] || 0) > 0 ? 'green' : ''} />
             ))}
-            <Kpi label="Total registrado" value={`$${rangePagos.reduce((a, p) => a + (+p.monto || 0), 0).toLocaleString()}`} />
+            <Kpi label="Total registrado" value={`$${Object.values(metodosMap).reduce((a, v) => a + v, 0).toLocaleString()}`} />
           </div>
           <div className="card" style={{ padding: '14px 20px', marginTop: 12 }}>
             {METODOS.map(({ key, label }) => {
