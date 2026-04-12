@@ -55,6 +55,11 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
     if (!form.telefono.trim()) { toast('El teléfono es requerido', 'error'); return }
     if (!form.fecha) { toast('La fecha es requerida', 'error'); return }
     if (!form.hora)  { toast('La hora es requerida', 'error'); return }
+    const hora = form.hora.slice(0, 5)
+    const openTime  = (config.open_time  || '00:00').slice(0, 5)
+    const closeTime = (config.close_time || '23:59').slice(0, 5)
+    if (hora < openTime)  { toast(`La hora no puede ser antes de la apertura (${openTime})`, 'error'); return }
+    if (hora > closeTime) { toast(`La hora no puede ser después del cierre (${closeTime})`, 'error'); return }
     const toNum = v => (v === '' || v == null) ? null : +v
     const payload = {
       ...form,
