@@ -1,7 +1,11 @@
-import { format, parseISO, differenceInDays, addDays } from 'date-fns'
+import { format, parseISO, differenceInDays, addDays, eachDayOfInterval } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { todayStr } from '../lib/utils'
 import { useConfig } from '../hooks/useConfig'
+import {
+  ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
+  PieChart, Pie, Cell, Legend,
+} from 'recharts'
 
 export default function Estadisticas({ sessions, gastos = [], pagos = [], extras = [], extrasTableError = false }) {
   const { config } = useConfig()
@@ -107,6 +111,53 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
   const totalExtras = rangeExtras.reduce((a, e) => a + (+e.monto || 0), 0)
   const maxExtra = Math.max(...extrasEntries.map(([, m]) => m), 1)
 
+  // ── Chart data ──
+  // Line chart: daily income over range
+  const lineData = (() => {
+    try {
+      const days = eachDayOfInterval({ start: parseISO(effectiveStart), end: parseISO(effectiveEnd) })
+      // Build daily income map from sessions
+      const byDate = {}
+      rangeActive.forEach(s => {
+        const d = s.fecha
+        byDate[d] = (byDate[d] || 0) + (+s.anticipo || 0) + (+s.pagos || 0)
+      })
+      let acum = 0
+      return days.map(d => {
+        const key = format(d, 'yyyy-MM-dd')
+        const day = byDate[key] || 0
+        acum += day
+        return {
+          fecha: format(d, 'd MMM', { locale: es }),
+          Día: day,
+          Acumulado: acum,
+        }
+      }).filter((_, i, arr) => {
+        // For large ranges show only days with data + thin out empties
+        if (arr.length <= 14) return true
+        return i === 0 || i === arr.length - 1 || arr[i].Día > 0
+      })
+    } catch { return [] }
+  })()
+
+  // Pie: payment methods
+  const COLORS = {
+    efectivo: '#2D8A3A', transferencia: '#6B4FA8', tarjeta: '#9E6B1A',
+    green: '#2D8A3A', violet: '#6B4FA8', amber: '#9E6B1A', red: '#9C3535',
+  }
+  const pieMetodos = METODOS
+    .map(m => ({ name: m.label, value: metodosMap[m.key] || 0, color: COLORS[m.key] }))
+    .filter(d => d.value > 0)
+
+  // Pie: session status
+  const PIE_STATUS = [
+    { name: 'Confirmadas',      value: rangeActive.filter(s => ['Reservada','Confirmada','Llegó','En sesión'].includes(s.estatus)).length, color: '#6B4FA8' },
+    { name: 'Completadas',      value: rangeActive.filter(s => s.estatus === 'Completada').length, color: '#2D8A3A' },
+    { name: 'Pend. entrega',    value: rangeActive.filter(s => s.estatus === 'Pendiente de entrega').length, color: '#9E6B1A' },
+    { name: 'Entregadas',       value: rangeActive.filter(s => s.estatus === 'Entregada').length, color: '#3BA44A' },
+    { name: 'Canceladas',       value: canceladas.length, color: '#9C3535' },
+  ].filter(d => d.value > 0)
+
   // ── Status breakdown ──
   const statusRows = [
     { label: 'Confirmadas / por llegar', count: rangeActive.filter(s => ['Reservada','Confirmada','Llegó','En sesión'].includes(s.estatus)).length, color: 'violet' },
@@ -164,6 +215,35 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
             </div>
           </div>
         </div>
+
+        {/* ── Gráfica de ingresos ── */}
+        {lineData.length > 1 && (
+          <div className="stats-block">
+            <div className="section-title">Ingresos cobrados en el período</div>
+            <div className="card" style={{ padding: '20px 12px 8px' }}>
+              <ResponsiveContainer width="100%" height={220}>
+                <LineChart data={lineData} margin={{ top: 4, right: 20, left: 0, bottom: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="fecha" tick={{ fontSize: 11, fill: 'var(--text3)' }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: 'var(--text3)' }} tickLine={false} axisLine={false}
+                    tickFormatter={v => v === 0 ? '' : `$${(v/1000).toFixed(0)}k`} width={40} />
+                  <Tooltip
+                    contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}
+                    labelStyle={{ color: 'var(--text2)', fontWeight: 600 }}
+                    formatter={(v, name) => [`$${v.toLocaleString()}`, name]}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+                  <Line type="monotone" dataKey="Día" stroke="#6B4FA8" strokeWidth={2}
+                    dot={{ r: 4, fill: '#6B4FA8', strokeWidth: 0 }}
+                    activeDot={{ r: 6 }} connectNulls />
+                  <Line type="monotone" dataKey="Acumulado" stroke="#2D8A3A" strokeWidth={2}
+                    dot={{ r: 3, fill: '#2D8A3A', strokeWidth: 0 }}
+                    activeDot={{ r: 6 }} connectNulls strokeDasharray="5 3" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
 
         {/* ── Anticipos ── */}
         <div className="stats-block">
@@ -293,6 +373,61 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
             </p>
           )}
         </div>
+
+        {/* ── Gráficas de pastel ── */}
+        {(pieMetodos.length > 0 || PIE_STATUS.length > 0) && (
+          <div className="stats-block">
+            <div className="section-title">Distribución</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+              {pieMetodos.length > 0 && (
+                <div className="card" style={{ padding: '16px 12px 8px' }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', marginBottom: 4, textAlign: 'center' }}>
+                    Entradas por método
+                  </div>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie data={pieMetodos} dataKey="value" nameKey="name"
+                        cx="50%" cy="50%" outerRadius={72} innerRadius={36}
+                        paddingAngle={3} strokeWidth={0}>
+                        {pieMetodos.map((entry, i) => (
+                          <Cell key={i} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}
+                        formatter={(v) => [`$${v.toLocaleString()}`]}
+                      />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+              {PIE_STATUS.length > 0 && (
+                <div className="card" style={{ padding: '16px 12px 8px' }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', marginBottom: 4, textAlign: 'center' }}>
+                    Sesiones por estatus
+                  </div>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie data={PIE_STATUS} dataKey="value" nameKey="name"
+                        cx="50%" cy="50%" outerRadius={72} innerRadius={36}
+                        paddingAngle={3} strokeWidth={0}>
+                        {PIE_STATUS.map((entry, i) => (
+                          <Cell key={i} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}
+                        formatter={(v, name) => [v, name]}
+                      />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ── Gastos por categoría ── */}
         {catEntries.length > 0 && (
