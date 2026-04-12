@@ -12,6 +12,7 @@ const METHODS = [
 const ANTICIPO_METHODS = [
   { key: 'efectivo',      label: 'Efectivo' },
   { key: 'transferencia', label: 'Transferencia' },
+  { key: 'cupon',         label: 'Cupón' },
 ]
 
 export default function SessionModal({ session, prefillDate, prefillHora, onSave, onClose, onDelete }) {
@@ -67,6 +68,9 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
       if (form.fecha < nowStr || (form.fecha === nowStr && hora <= nowTime)) {
         toast('No puedes agendar sesiones en el pasado', 'error'); return
       }
+    }
+    if (form.metodo_anticipo === 'cupon' && !(+form.anticipo > 0)) {
+      toast('Ingresa el costo de sesión cubierto por el cupón', 'error'); return
     }
     const toNum = v => (v === '' || v == null) ? null : +v
     const payload = {
@@ -188,9 +192,12 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
         <div className="modal-section-title">Pago</div>
         <div className="form-grid">
           <div className="form-group">
-            <label className="form-label">Anticipo recibido ($)</label>
+            <label className="form-label">
+              {form.metodo_anticipo === 'cupon' ? 'Costo de sesión (cupón) *' : 'Anticipo recibido ($)'}
+            </label>
             <input className="form-input" type="number" min="0" value={form.anticipo}
-              onChange={e => set('anticipo', e.target.value)} placeholder="0" />
+              onChange={e => set('anticipo', e.target.value)}
+              placeholder={form.metodo_anticipo === 'cupon' ? 'Costo total de la sesión' : '0'} />
           </div>
           <div className="form-group">
             <label className="form-label">Método del anticipo</label>

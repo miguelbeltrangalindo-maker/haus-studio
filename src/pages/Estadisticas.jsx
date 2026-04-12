@@ -74,6 +74,10 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
   } catch {}
   const promedioSesionesDia = diasConSesion > 0 ? (rangeActive.length / diasConSesion).toFixed(1) : '0'
 
+  // ── Cupones ──
+  const sessionesCupon  = rangeActive.filter(s => s.metodo_anticipo === 'cupon')
+  const totalCupon      = sessionesCupon.reduce((a, s) => a + (+s.anticipo || 0), 0)
+
   // ── Anticipos por método ──
   const anticipoEfectivo      = rangeActive.filter(s => s.metodo_anticipo === 'efectivo').reduce((a, s) => a + (+s.anticipo || 0), 0)
   const anticipoTransferencia = rangeActive.filter(s => s.metodo_anticipo === 'transferencia').reduce((a, s) => a + (+s.anticipo || 0), 0)
@@ -98,6 +102,7 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
     { key: 'efectivo',      label: 'Efectivo' },
     { key: 'transferencia', label: 'Transferencia' },
     { key: 'tarjeta',       label: 'Tarjeta' },
+    { key: 'cupon',         label: 'Cupón' },
   ]
   const maxMetodo = Math.max(...Object.values(metodosMap), 1)
 
@@ -142,7 +147,7 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
 
   // Pie: payment methods
   const COLORS = {
-    efectivo: '#2D8A3A', transferencia: '#6B4FA8', tarjeta: '#9E6B1A',
+    efectivo: '#2D8A3A', transferencia: '#6B4FA8', tarjeta: '#9E6B1A', cupon: '#1A7A9E',
     green: '#2D8A3A', violet: '#6B4FA8', amber: '#9E6B1A', red: '#9C3535',
   }
   const pieMetodos = METODOS
@@ -272,6 +277,32 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
             ))}
           </div>
         </div>
+
+        {/* ── Cupones ── */}
+        {(sessionesCupon.length > 0 || rangeActive.some(s => s.metodo_anticipo === 'cupon')) && (
+          <div className="stats-block">
+            <div className="section-title">Cupones</div>
+            <div className="stat-kpis">
+              <Kpi label="Sesiones con cupón"  value={sessionesCupon.length}                    color={sessionesCupon.length > 0 ? 'violet' : ''} />
+              <Kpi label="Costo total cubierto" value={`$${totalCupon.toLocaleString()}`}        color={totalCupon > 0 ? 'green' : ''} />
+              <Kpi label="Promedio por cupón"   value={sessionesCupon.length > 0 ? `$${Math.round(totalCupon / sessionesCupon.length).toLocaleString()}` : '—'} />
+            </div>
+            {sessionesCupon.length > 0 && (
+              <div className="card" style={{ padding: '14px 20px', marginTop: 12 }}>
+                <div className="section-title" style={{ marginBottom: 10 }}>Sesiones con cupón</div>
+                {sessionesCupon.map(s => (
+                  <div key={s.id} className="breakdown-row">
+                    <div className="breakdown-label">{s.nombre}</div>
+                    <div className="breakdown-right">
+                      <span className="breakdown-date">{s.fecha}</span>
+                      <span className="breakdown-amount" style={{ color: 'var(--text-violet, #6B4FA8)' }}>${(+s.anticipo).toLocaleString()}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Cobros ── */}
         <div className="stats-block">
