@@ -31,7 +31,7 @@ export default function Dashboard(props) {
   const totalSessions  = rangeActive.length
   const confirmadas    = rangeActive.filter(s => ['Reservada', 'Confirmada', 'Llegó', 'En sesión'].includes(s.estatus))
   const pendEntrega    = rangeActive.filter(s => s.estatus === 'Pendiente de entrega')
-  const pendPago       = rangeActive.filter(s => s.estatus === 'Pendiente de pago')
+  const pendPago       = rangeActive.filter(s => +s.restante > 0)
   const entregadas     = rangeSessions.filter(s => s.estatus === 'Entregada')
   const canceladas     = rangeSessions.filter(s => ['Cancelada', 'No show'].includes(s.estatus))
   const liquidadas     = rangeActive.filter(s =>
