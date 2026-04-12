@@ -45,7 +45,7 @@ function AppInner() {
           <Route path="/agenda"        element={<Agenda       {...shared} />} />
           <Route path="/sesiones"      element={<Sesiones     {...shared} />} />
           <Route path="/gastos"        element={<Gastos gastos={gastos} loading={gastosLoading} tableError={tableError} createGasto={createGasto} deleteGasto={deleteGasto} />} />
-          <Route path="/estadisticas"  element={<Estadisticas sessions={sessions} gastos={gastos} pagos={pagos} />} />
+          <Route path="/estadisticas"  element={<Estadisticas sessions={sessions} gastos={gastos} pagos={pagos} extras={extras} />} />
           <Route path="/config"        element={<Config />} />
         </Routes>
       </main>

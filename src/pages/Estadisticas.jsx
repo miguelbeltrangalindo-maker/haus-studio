@@ -3,7 +3,7 @@ import { es } from 'date-fns/locale'
 import { todayStr } from '../lib/utils'
 import { useConfig } from '../hooks/useConfig'
 
-export default function Estadisticas({ sessions, gastos = [], pagos = [] }) {
+export default function Estadisticas({ sessions, gastos = [], pagos = [], extras = [] }) {
   const { config } = useConfig()
 
   const today = todayStr()
@@ -81,6 +81,16 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [] }) {
     { key: 'tarjeta',       label: 'Tarjeta' },
   ]
   const maxMetodo = Math.max(...Object.values(metodosMap), 1)
+
+  // ── Cargos extras ──
+  const rangeExtras = extras.filter(e => sessionIdsInRange.has(e.session_id))
+  const extrasPorConcepto = rangeExtras.reduce((acc, e) => {
+    acc[e.concepto] = (acc[e.concepto] || 0) + (+e.monto || 0)
+    return acc
+  }, {})
+  const extrasEntries = Object.entries(extrasPorConcepto).sort((a, b) => b[1] - a[1])
+  const totalExtras = rangeExtras.reduce((a, e) => a + (+e.monto || 0), 0)
+  const maxExtra = Math.max(...extrasEntries.map(([, m]) => m), 1)
 
   // ── Status breakdown ──
   const statusRows = [
@@ -257,6 +267,34 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [] }) {
             </div>
           </div>
         )}
+
+        {/* ── Cargos extras por concepto ── */}
+        <div className="stats-block">
+          <div className="section-title">Cargos adicionales por concepto</div>
+          {extrasEntries.length > 0 ? (
+            <>
+              <div className="stat-kpis">
+                <Kpi label="Total cargos extras" value={`$${totalExtras.toLocaleString()}`} color="amber" />
+                <Kpi label="Número de cargos"    value={rangeExtras.length} />
+              </div>
+              <div className="card" style={{ padding: '14px 20px', marginTop: 12 }}>
+                {extrasEntries.map(([concepto, monto]) => (
+                  <div key={concepto} className="breakdown-row">
+                    <div className="breakdown-label">{concepto}</div>
+                    <div className="bvs-track" style={{ flex: 1, margin: '0 12px' }}>
+                      <div className="bvs-bar amber" style={{ width: `${Math.round((monto / maxExtra) * 100)}%` }} />
+                    </div>
+                    <div className="breakdown-amount amber">${monto.toLocaleString()}</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="card" style={{ padding: '14px 20px', fontSize: 13, color: 'var(--text3)' }}>
+              Sin cargos adicionales en este rango
+            </div>
+          )}
+        </div>
 
       </div>
     </>
