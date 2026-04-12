@@ -889,6 +889,15 @@ select.form-input { background-image: url("data:image/svg+xml,%3Csvg xmlns='http
   line-height: 1;
 }
 
+.qty-btn {
+  width: 26px; height: 26px; border-radius: 50%;
+  border: 1.5px solid var(--border); background: var(--bg2); color: var(--text);
+  font-size: 16px; line-height: 1; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s, border-color .15s; flex-shrink: 0;
+}
+.qty-btn:hover { background: var(--bg3); border-color: var(--violet); color: var(--violet); }
+
 .method-tabs {
   display: flex;
   gap: 6px;

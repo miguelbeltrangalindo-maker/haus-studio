@@ -11,6 +11,7 @@ const DEFAULT_CONFIG = {
   session_minutes: 20,
   stats_start: '',
   stats_end: '',
+  extra_conceptos: [],
   reminder_message: 'Hola, {nombre}. Te damos la bienvenida a HAUS. Te recordamos que tu sesión está agendada para el día {fecha} a las {hora}. Te pedimos presentarte 10 minutos antes de tu horario. La duración de tu sesión es de 20 minutos y cada espacio se agenda cada media hora para poder atender cualquier contratiempo de forma puntual. ¡Te esperamos!',
   delivery_message: 'Hola, {nombre}. Muchas gracias por visitar HAUS. Tus fotos ya están listas. Te compartimos el vínculo de entrega: {link} Gracias por confiar en nosotros.',
 }
@@ -31,7 +32,11 @@ export function ConfigProvider({ children }) {
   const updateConfig = async (updates) => {
     const next = { ...config, ...updates }
     setConfig(next)
-    await supabase.from('config').upsert({ id: 1, ...next })
+    const { error } = await supabase.from('config').upsert({ id: 1, ...next })
+    if (error && (error.message.includes('schema cache') || error.message.includes('column') || error.message.includes('does not exist'))) {
+      const { extra_conceptos, ...simple } = next
+      await supabase.from('config').upsert({ id: 1, ...simple })
+    }
     return next
   }
 

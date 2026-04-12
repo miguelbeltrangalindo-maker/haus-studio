@@ -19,14 +19,29 @@ export function useExtras() {
 
   useEffect(() => { fetch() }, [])
 
-  const createExtra = async (session_id, concepto, monto) => {
+  const createExtra = async (session_id, concepto, monto, cantidad = 1, precio_unitario = null) => {
     if (tableError) return { error: 'Tabla no disponible' }
+    const payload = { session_id, concepto, monto, cantidad }
+    if (precio_unitario != null) payload.precio_unitario = precio_unitario
     const { data, error } = await supabase
       .from('session_extras')
-      .insert([{ session_id, concepto, monto }])
+      .insert([payload])
       .select()
       .single()
-    if (error) return { error: error.message }
+    if (error) {
+      // Retry without new columns if schema not updated yet
+      if (error.message.includes('column') || error.message.includes('schema cache')) {
+        const { data: d2, error: e2 } = await supabase
+          .from('session_extras')
+          .insert([{ session_id, concepto, monto }])
+          .select()
+          .single()
+        if (e2) return { error: e2.message }
+        setExtras(prev => [...prev, d2])
+        return { data: d2 }
+      }
+      return { error: error.message }
+    }
     setExtras(prev => [...prev, data])
     return { data }
   }

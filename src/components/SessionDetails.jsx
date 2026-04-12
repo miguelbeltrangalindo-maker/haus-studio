@@ -13,20 +13,16 @@ const METHODS = [
 
 const METHOD_LABEL = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta' }
 
-const EXTRA_PRESETS = ['Personas adicionales', 'Galería web', 'Impresiones', 'Álbum', 'Otro']
-
 export default function SessionDetails({ session, onClose, updateSession, deleteSession, sessionPagos = [], createPago, sessionExtras = [], createExtra, deleteExtra }) {
   const { config } = useConfig()
   const toast = useToast()
-  const [editOpen, setEditOpen]     = useState(false)
-  const [advancing, setAdvancing]   = useState(false)
-  const [payAmount, setPayAmount]   = useState('')
-  const [payMethod, setPayMethod]   = useState('efectivo')
-  const [paying, setPaying]         = useState(false)
-  const [extraConcepto, setExtraConcepto] = useState('')
-  const [extraMonto, setExtraMonto]       = useState('')
-  const [addingExtra, setAddingExtra]     = useState(false)
-  const [showExtraForm, setShowExtraForm] = useState(false)
+  const [editOpen, setEditOpen]   = useState(false)
+  const [advancing, setAdvancing] = useState(false)
+  const [payAmount, setPayAmount] = useState('')
+  const [payMethod, setPayMethod] = useState('efectivo')
+  const [paying, setPaying]       = useState(false)
+  const [extraQtys, setExtraQtys] = useState({})
+  const [applyingExtras, setApplyingExtras] = useState(false)
 
   if (!session) return null
 
@@ -63,21 +59,24 @@ export default function SessionDetails({ session, onClose, updateSession, delete
     setPaying(false)
   }
 
-  const handleAddExtra = async () => {
-    const monto = +extraMonto
-    if (!extraConcepto.trim()) { toast('Ingresa un concepto', 'error'); return }
-    if (!monto || monto <= 0) { toast('Ingresa un monto válido', 'error'); return }
-    setAddingExtra(true)
-    const result = await createExtra(session.id, extraConcepto.trim(), monto)
-    if (result.error) { toast(result.error, 'error'); setAddingExtra(false); return }
-    // Add to session restante
-    const newRestante = (+session.restante || 0) + monto
-    await updateSession(session.id, { restante: String(newRestante) })
-    toast(`Cargo "${extraConcepto.trim()}" agregado`, 'success')
-    setExtraConcepto('')
-    setExtraMonto('')
-    setShowExtraForm(false)
-    setAddingExtra(false)
+  const conceptos = config.extra_conceptos || []
+
+  const handleApplyExtras = async () => {
+    const toAdd = conceptos.filter(c => (extraQtys[c.id] || 0) > 0)
+    if (!toAdd.length) return
+    setApplyingExtras(true)
+    let totalMonto = 0
+    for (const c of toAdd) {
+      const qty = extraQtys[c.id]
+      const monto = qty * c.precio_unitario
+      const result = await createExtra(session.id, c.nombre, monto, qty, c.precio_unitario)
+      if (result.error) { toast(result.error, 'error'); setApplyingExtras(false); return }
+      totalMonto += monto
+    }
+    await updateSession(session.id, { restante: String((+session.restante || 0) + totalMonto) })
+    toast(`$${totalMonto.toLocaleString()} en cargos agregados`, 'success')
+    setExtraQtys({})
+    setApplyingExtras(false)
   }
 
   const handleDeleteExtra = async (extra) => {
@@ -200,68 +199,57 @@ export default function SessionDetails({ session, onClose, updateSession, delete
         {/* Cargos adicionales */}
         {createExtra && (
           <div className="dp-section">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <div className="dp-section-label" style={{ marginBottom: 0 }}>Cargos adicionales</div>
-              {!showExtraForm && (
-                <button className="btn btn-ghost btn-xs" onClick={() => setShowExtraForm(true)} style={{ fontSize: 12 }}>+ Agregar</button>
-              )}
-            </div>
+            <div className="dp-section-label">Cargos adicionales</div>
 
-            {sessionExtras.length > 0 && sessionExtras.map(e => (
+            {/* Applied extras */}
+            {sessionExtras.map(e => (
               <div key={e.id} className="dp-meta-row">
-                <span className="dp-meta-label">{e.concepto}</span>
+                <span className="dp-meta-label">
+                  {e.concepto}{(e.cantidad > 1) ? ` ×${e.cantidad}` : ''}
+                </span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span className="dp-meta-value" style={{ color: 'var(--amber-l)' }}>+${(+e.monto).toLocaleString()}</span>
                   {deleteExtra && (
-                    <button
-                      onClick={() => handleDeleteExtra(e)}
-                      style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 0 }}
-                      title="Eliminar"
-                    >×</button>
+                    <button onClick={() => handleDeleteExtra(e)}
+                      style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0 }}>×</button>
                   )}
                 </span>
               </div>
             ))}
 
-            {sessionExtras.length === 0 && !showExtraForm && (
-              <div style={{ fontSize: 12, color: 'var(--text3)' }}>Sin cargos adicionales</div>
-            )}
-
-            {showExtraForm && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {EXTRA_PRESETS.map(p => (
-                    <button
-                      key={p}
-                      type="button"
-                      className={`pill${extraConcepto === p ? ' active' : ''}`}
-                      style={{ fontSize: 11 }}
-                      onClick={() => setExtraConcepto(p)}
-                    >{p}</button>
-                  ))}
-                </div>
-                <input
-                  className="form-input"
-                  placeholder="Concepto"
-                  value={extraConcepto}
-                  onChange={e => setExtraConcepto(e.target.value)}
-                />
-                <input
-                  className="form-input"
-                  type="number"
-                  min="1"
-                  placeholder="Monto"
-                  value={extraMonto}
-                  onChange={e => setExtraMonto(e.target.value)}
-                />
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button className="btn btn-primary btn-sm" onClick={handleAddExtra} disabled={addingExtra} style={{ flex: 1 }}>
-                    {addingExtra ? 'Guardando…' : 'Agregar cargo'}
-                  </button>
-                  <button className="btn btn-sm" onClick={() => { setShowExtraForm(false); setExtraConcepto(''); setExtraMonto('') }}>
-                    Cancelar
-                  </button>
-                </div>
+            {/* Quantity pickers from config */}
+            {conceptos.length > 0 ? (
+              <>
+                {conceptos.map(c => {
+                  const qty = extraQtys[c.id] || 0
+                  const subtotal = qty * c.precio_unitario
+                  return (
+                    <div key={c.id} className="dp-meta-row" style={{ paddingBlock: 7 }}>
+                      <span className="dp-meta-label">{c.nombre}
+                        <span style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 4 }}>${c.precio_unitario.toLocaleString()}/u</span>
+                      </span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {subtotal > 0 && <span style={{ fontSize: 11, color: 'var(--amber-l)', marginRight: 4 }}>${subtotal.toLocaleString()}</span>}
+                        <button className="qty-btn" onClick={() => setExtraQtys(q => ({ ...q, [c.id]: Math.max(0, (q[c.id] || 0) - 1) }))}>−</button>
+                        <span style={{ width: 22, textAlign: 'center', fontWeight: 600, fontSize: 14 }}>{qty}</span>
+                        <button className="qty-btn" onClick={() => setExtraQtys(q => ({ ...q, [c.id]: Math.min(9, (q[c.id] || 0) + 1) }))}>+</button>
+                      </span>
+                    </div>
+                  )
+                })}
+                {Object.values(extraQtys).some(q => q > 0) && (() => {
+                  const total = conceptos.reduce((s, c) => s + (extraQtys[c.id] || 0) * c.precio_unitario, 0)
+                  return (
+                    <button className="btn btn-primary btn-sm" onClick={handleApplyExtras} disabled={applyingExtras}
+                      style={{ width: '100%', marginTop: 8 }}>
+                      {applyingExtras ? 'Guardando…' : `Agregar $${total.toLocaleString()}`}
+                    </button>
+                  )
+                })()}
+              </>
+            ) : (
+              <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: sessionExtras.length > 0 ? 8 : 0 }}>
+                Configura los conceptos en Configuración → Cargos adicionales
               </div>
             )}
           </div>

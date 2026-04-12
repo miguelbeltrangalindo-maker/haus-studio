@@ -8,10 +8,29 @@ export default function Config() {
   const toast = useToast()
   const [form, setForm] = useState(config)
   const [saving, setSaving] = useState(false)
+  const [newConcepto, setNewConcepto] = useState('')
+  const [newPrecio, setNewPrecio]     = useState('')
+  const [addingC, setAddingC]         = useState(false)
 
   useEffect(() => { setForm(config) }, [config])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  const conceptos = form.extra_conceptos || []
+
+  const handleAddConcepto = () => {
+    if (!newConcepto.trim()) { toast('Ingresa un nombre', 'error'); return }
+    if (!+newPrecio || +newPrecio <= 0) { toast('Ingresa un precio válido', 'error'); return }
+    const nuevo = { id: crypto.randomUUID(), nombre: newConcepto.trim(), precio_unitario: +newPrecio }
+    set('extra_conceptos', [...conceptos, nuevo])
+    setNewConcepto('')
+    setNewPrecio('')
+    setAddingC(false)
+  }
+
+  const handleRemoveConcepto = (id) => {
+    set('extra_conceptos', conceptos.filter(c => c.id !== id))
+  }
 
   const handleSave = async () => {
     setSaving(true)
@@ -146,6 +165,56 @@ export default function Config() {
                   .replace(/{link}/g, 'https://drive.google.com/tu-galeria')}
               </div>
             </div>
+          </div>
+
+          <div className="config-section">
+            <div className="config-title">Cargos adicionales</div>
+            <div style={{ marginBottom: 14, fontSize: 13, color: 'var(--text3)' }}>
+              Define los cargos que pueden añadirse a cada sesión. Cada uno tiene un precio por unidad y se puede aplicar hasta ×9 veces.
+            </div>
+
+            {conceptos.length > 0 && (
+              <div className="card" style={{ padding: '10px 16px', marginBottom: 12 }}>
+                {conceptos.map(c => (
+                  <div key={c.id} className="dp-meta-row" style={{ paddingBlock: 8 }}>
+                    <span className="dp-meta-label" style={{ fontWeight: 500 }}>{c.nombre}</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <span style={{ fontSize: 13, color: 'var(--text2)' }}>${(+c.precio_unitario).toLocaleString()} / u</span>
+                      <button
+                        onClick={() => handleRemoveConcepto(c.id)}
+                        style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0 }}
+                        title="Eliminar"
+                      >×</button>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {addingC ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label className="form-label">Nombre del concepto</label>
+                    <input className="form-input" placeholder="Ej. Persona adicional"
+                      value={newConcepto} onChange={e => setNewConcepto(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleAddConcepto()} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Precio por unidad ($)</label>
+                    <input className="form-input" type="number" min="1" placeholder="200"
+                      value={newPrecio} onChange={e => setNewPrecio(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleAddConcepto()} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn btn-primary btn-sm" onClick={handleAddConcepto}>Guardar concepto</button>
+                  <button className="btn btn-sm" onClick={() => { setAddingC(false); setNewConcepto(''); setNewPrecio('') }}>Cancelar</button>
+                </div>
+              </div>
+            ) : (
+              <button className="btn btn-ghost btn-sm" onClick={() => setAddingC(true)}>+ Nuevo concepto</button>
+            )}
           </div>
 
           <div style={{ paddingTop: 8 }}>
