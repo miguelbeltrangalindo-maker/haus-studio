@@ -60,6 +60,14 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
     const closeTime = (config.close_time || '23:59').slice(0, 5)
     if (hora < openTime)  { toast(`La hora no puede ser antes de la apertura (${openTime})`, 'error'); return }
     if (hora > closeTime) { toast(`La hora no puede ser después del cierre (${closeTime})`, 'error'); return }
+    if (isNew) {
+      const now = new Date()
+      const nowStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
+      const nowTime = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
+      if (form.fecha < nowStr || (form.fecha === nowStr && hora <= nowTime)) {
+        toast('No puedes agendar sesiones en el pasado', 'error'); return
+      }
+    }
     const toNum = v => (v === '' || v == null) ? null : +v
     const payload = {
       ...form,
