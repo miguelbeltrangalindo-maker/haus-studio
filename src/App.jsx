@@ -13,10 +13,12 @@ import { ToastProvider } from './hooks/useToast'
 import { ConfigProvider } from './hooks/useConfig'
 import { useSessions } from './hooks/useSessions'
 import { useGastos } from './hooks/useGastos'
+import { usePagos } from './hooks/usePagos'
 
 function AppInner() {
   const { sessions, loading, createSession, updateSession, deleteSession, fetch } = useSessions()
   const { gastos, loading: gastosLoading, tableError, createGasto, deleteGasto } = useGastos()
+  const { pagos, createPago } = usePagos()
   const [selectedId, setSelectedId] = useState(null)
   const location = useLocation()
 
@@ -41,7 +43,7 @@ function AppInner() {
           <Route path="/agenda"        element={<Agenda       {...shared} />} />
           <Route path="/sesiones"      element={<Sesiones     {...shared} />} />
           <Route path="/gastos"        element={<Gastos gastos={gastos} loading={gastosLoading} tableError={tableError} createGasto={createGasto} deleteGasto={deleteGasto} />} />
-          <Route path="/estadisticas"  element={<Estadisticas sessions={sessions} gastos={gastos} />} />
+          <Route path="/estadisticas"  element={<Estadisticas sessions={sessions} gastos={gastos} pagos={pagos} />} />
           <Route path="/config"        element={<Config />} />
         </Routes>
       </main>
@@ -50,6 +52,8 @@ function AppInner() {
           session={currentSelected}
           onClose={() => setSelectedId(null)}
           updateSession={updateSession}
+          sessionPagos={pagos.filter(p => p.session_id === currentSelected?.id)}
+          createPago={createPago}
         />
       )}
     </div>

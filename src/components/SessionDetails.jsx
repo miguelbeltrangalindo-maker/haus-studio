@@ -11,7 +11,9 @@ const METHODS = [
   { key: 'tarjeta',       label: 'Tarjeta' },
 ]
 
-export default function SessionDetails({ session, onClose, updateSession }) {
+const METHOD_LABEL = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta' }
+
+export default function SessionDetails({ session, onClose, updateSession, sessionPagos = [], createPago }) {
   const { config } = useConfig()
   const toast = useToast()
   const [editOpen, setEditOpen]     = useState(false)
@@ -49,6 +51,7 @@ export default function SessionDetails({ session, onClose, updateSession }) {
     setPaying(true)
     const result = await updateSession(session.id, updates)
     if (result.error) { toast(result.error, 'error'); setPaying(false); return }
+    if (createPago) await createPago(session.id, amount, payMethod)
     toast(`$${amount.toLocaleString()} cobrado ✓`, 'success')
     setPayAmount('')
     setPaying(false)
@@ -193,6 +196,23 @@ export default function SessionDetails({ session, onClose, updateSession }) {
                 <span style={{ fontSize: 12, color: 'var(--green-l)', textAlign: 'center' }}>Saldo liquidado ✓</span>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Payment history */}
+        {sessionPagos.length > 0 && (
+          <div className="dp-section">
+            <div className="dp-section-label">Historial de pagos</div>
+            {sessionPagos.map(p => (
+              <div key={p.id} className="dp-meta-row">
+                <span className="dp-meta-label" style={{ textTransform: 'capitalize' }}>
+                  {METHOD_LABEL[p.metodo] || p.metodo}
+                </span>
+                <span className="dp-meta-value" style={{ color: 'var(--green-l)', fontWeight: 600 }}>
+                  ${(+p.monto).toLocaleString()}
+                </span>
+              </div>
+            ))}
           </div>
         )}
 

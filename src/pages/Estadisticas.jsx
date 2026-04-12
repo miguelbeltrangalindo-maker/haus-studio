@@ -3,7 +3,7 @@ import { es } from 'date-fns/locale'
 import { todayStr } from '../lib/utils'
 import { useConfig } from '../hooks/useConfig'
 
-export default function Estadisticas({ sessions, gastos = [] }) {
+export default function Estadisticas({ sessions, gastos = [], pagos = [] }) {
   const { config } = useConfig()
 
   const today = todayStr()
@@ -66,6 +66,21 @@ export default function Estadisticas({ sessions, gastos = [] }) {
     ocupacion  = Math.round((diasConSesion / totalDias) * 100)
   } catch {}
   const promedioSesionesDia = diasConSesion > 0 ? (rangeActive.length / diasConSesion).toFixed(1) : '0'
+
+  // ── Cobros por método ──
+  const sessionIdsInRange = new Set(rangeActive.map(s => s.id))
+  const rangePagos = pagos.filter(p => sessionIdsInRange.has(p.session_id))
+  const metodosMap = rangePagos.reduce((acc, p) => {
+    const key = p.metodo || 'efectivo'
+    acc[key] = (acc[key] || 0) + (+p.monto || 0)
+    return acc
+  }, {})
+  const METODOS = [
+    { key: 'efectivo',      label: 'Efectivo' },
+    { key: 'transferencia', label: 'Transferencia' },
+    { key: 'tarjeta',       label: 'Tarjeta' },
+  ]
+  const maxMetodo = Math.max(...Object.values(metodosMap), 1)
 
   // ── Status breakdown ──
   const statusRows = [
@@ -149,6 +164,32 @@ export default function Estadisticas({ sessions, gastos = [] }) {
             </div>
           )}
         </div>
+
+        {/* ── Cobros por método ── */}
+        {rangePagos.length > 0 && (
+          <div className="stats-block">
+            <div className="section-title">Cobros por método de pago</div>
+            <div className="card" style={{ padding: '14px 20px' }}>
+              {METODOS.map(({ key, label }) => {
+                const monto = metodosMap[key] || 0
+                if (!monto) return null
+                return (
+                  <div key={key} className="breakdown-row">
+                    <div className="breakdown-label">{label}</div>
+                    <div className="bvs-track" style={{ flex: 1, margin: '0 12px' }}>
+                      <div className="bvs-bar green" style={{ width: `${Math.round((monto / maxMetodo) * 100)}%` }} />
+                    </div>
+                    <div className="breakdown-amount green">${monto.toLocaleString()}</div>
+                  </div>
+                )
+              })}
+              <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text3)' }}>
+                Total registrado: <strong style={{ color: 'var(--text2)' }}>${rangePagos.reduce((a, p) => a + (+p.monto || 0), 0).toLocaleString()}</strong>
+                {' · '}{rangePagos.length} pago{rangePagos.length !== 1 ? 's' : ''}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Sesiones ── */}
         <div className="stats-block">
