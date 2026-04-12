@@ -14,11 +14,13 @@ import { ConfigProvider } from './hooks/useConfig'
 import { useSessions } from './hooks/useSessions'
 import { useGastos } from './hooks/useGastos'
 import { usePagos } from './hooks/usePagos'
+import { useExtras } from './hooks/useExtras'
 
 function AppInner() {
   const { sessions, loading, createSession, updateSession, deleteSession, fetch } = useSessions()
   const { gastos, loading: gastosLoading, tableError, createGasto, deleteGasto } = useGastos()
   const { pagos, createPago } = usePagos()
+  const { extras, createExtra, deleteExtra } = useExtras()
   const [selectedId, setSelectedId] = useState(null)
   const location = useLocation()
 
@@ -54,6 +56,9 @@ function AppInner() {
           updateSession={updateSession}
           sessionPagos={pagos.filter(p => p.session_id === currentSelected?.id)}
           createPago={createPago}
+          sessionExtras={extras.filter(e => e.session_id === currentSelected?.id)}
+          createExtra={createExtra}
+          deleteExtra={deleteExtra}
         />
       )}
     </div>

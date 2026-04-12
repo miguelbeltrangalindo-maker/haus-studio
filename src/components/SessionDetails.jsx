@@ -13,7 +13,9 @@ const METHODS = [
 
 const METHOD_LABEL = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta' }
 
-export default function SessionDetails({ session, onClose, updateSession, sessionPagos = [], createPago }) {
+const EXTRA_PRESETS = ['Personas adicionales', 'Galería web', 'Impresiones', 'Álbum', 'Otro']
+
+export default function SessionDetails({ session, onClose, updateSession, sessionPagos = [], createPago, sessionExtras = [], createExtra, deleteExtra }) {
   const { config } = useConfig()
   const toast = useToast()
   const [editOpen, setEditOpen]     = useState(false)
@@ -21,6 +23,10 @@ export default function SessionDetails({ session, onClose, updateSession, sessio
   const [payAmount, setPayAmount]   = useState('')
   const [payMethod, setPayMethod]   = useState('efectivo')
   const [paying, setPaying]         = useState(false)
+  const [extraConcepto, setExtraConcepto] = useState('')
+  const [extraMonto, setExtraMonto]       = useState('')
+  const [addingExtra, setAddingExtra]     = useState(false)
+  const [showExtraForm, setShowExtraForm] = useState(false)
 
   if (!session) return null
 
@@ -55,6 +61,31 @@ export default function SessionDetails({ session, onClose, updateSession, sessio
     toast(`$${amount.toLocaleString()} cobrado ✓`, 'success')
     setPayAmount('')
     setPaying(false)
+  }
+
+  const handleAddExtra = async () => {
+    const monto = +extraMonto
+    if (!extraConcepto.trim()) { toast('Ingresa un concepto', 'error'); return }
+    if (!monto || monto <= 0) { toast('Ingresa un monto válido', 'error'); return }
+    setAddingExtra(true)
+    const result = await createExtra(session.id, extraConcepto.trim(), monto)
+    if (result.error) { toast(result.error, 'error'); setAddingExtra(false); return }
+    // Add to session restante
+    const newRestante = (+session.restante || 0) + monto
+    await updateSession(session.id, { restante: String(newRestante) })
+    toast(`Cargo "${extraConcepto.trim()}" agregado`, 'success')
+    setExtraConcepto('')
+    setExtraMonto('')
+    setShowExtraForm(false)
+    setAddingExtra(false)
+  }
+
+  const handleDeleteExtra = async (extra) => {
+    if (!confirm(`¿Eliminar "${extra.concepto}"?`)) return
+    await deleteExtra(extra.id)
+    const newRestante = Math.max(0, (+session.restante || 0) - (+extra.monto || 0))
+    await updateSession(session.id, { restante: String(newRestante) })
+    toast('Cargo eliminado')
   }
 
   const openWA = (type) => {
@@ -154,6 +185,76 @@ export default function SessionDetails({ session, onClose, updateSession, sessio
             {session.metodo_pago && (
               <div style={{ width: '100%', fontSize: 12, color: 'var(--text3)', marginTop: 2, textTransform: 'capitalize' }}>
                 Pagado con {session.metodo_pago}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Cargos adicionales */}
+        {createExtra && (
+          <div className="dp-section">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <div className="dp-section-label" style={{ marginBottom: 0 }}>Cargos adicionales</div>
+              {!showExtraForm && (
+                <button className="btn btn-ghost btn-xs" onClick={() => setShowExtraForm(true)} style={{ fontSize: 12 }}>+ Agregar</button>
+              )}
+            </div>
+
+            {sessionExtras.length > 0 && sessionExtras.map(e => (
+              <div key={e.id} className="dp-meta-row">
+                <span className="dp-meta-label">{e.concepto}</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className="dp-meta-value" style={{ color: 'var(--amber-l)' }}>+${(+e.monto).toLocaleString()}</span>
+                  {deleteExtra && (
+                    <button
+                      onClick={() => handleDeleteExtra(e)}
+                      style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 0 }}
+                      title="Eliminar"
+                    >×</button>
+                  )}
+                </span>
+              </div>
+            ))}
+
+            {sessionExtras.length === 0 && !showExtraForm && (
+              <div style={{ fontSize: 12, color: 'var(--text3)' }}>Sin cargos adicionales</div>
+            )}
+
+            {showExtraForm && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {EXTRA_PRESETS.map(p => (
+                    <button
+                      key={p}
+                      type="button"
+                      className={`pill${extraConcepto === p ? ' active' : ''}`}
+                      style={{ fontSize: 11 }}
+                      onClick={() => setExtraConcepto(p)}
+                    >{p}</button>
+                  ))}
+                </div>
+                <input
+                  className="form-input"
+                  placeholder="Concepto"
+                  value={extraConcepto}
+                  onChange={e => setExtraConcepto(e.target.value)}
+                />
+                <input
+                  className="form-input"
+                  type="number"
+                  min="1"
+                  placeholder="Monto"
+                  value={extraMonto}
+                  onChange={e => setExtraMonto(e.target.value)}
+                />
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button className="btn btn-primary btn-sm" onClick={handleAddExtra} disabled={addingExtra} style={{ flex: 1 }}>
+                    {addingExtra ? 'Guardando…' : 'Agregar cargo'}
+                  </button>
+                  <button className="btn btn-sm" onClick={() => { setShowExtraForm(false); setExtraConcepto(''); setExtraMonto('') }}>
+                    Cancelar
+                  </button>
+                </div>
               </div>
             )}
           </div>
