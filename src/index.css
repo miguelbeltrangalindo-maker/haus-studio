@@ -1044,6 +1044,21 @@ select.form-input { background-image: url("data:image/svg+xml,%3Csvg xmlns='http
 }
 .dp-link:hover { text-decoration: underline; }
 
+.dp-alert {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 16px; font-size: 12.5px; line-height: 1.4;
+  border-left: 3px solid; margin: 0;
+}
+.dp-alert.amber {
+  background: rgba(158,107,26,.08); border-color: var(--amber);
+  color: var(--amber);
+}
+.dp-alert.red {
+  background: rgba(156,53,53,.08); border-color: var(--red);
+  color: var(--red);
+}
+.dp-alert span { flex: 1 }
+
 .dp-actions {
   display: flex; flex-direction: column; gap: 8px;
   padding: 14px 20px 20px;

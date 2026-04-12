@@ -32,6 +32,15 @@ export default function SessionDetails({ session, onClose, updateSession, delete
   const nextLbl = nextStatusLabel(session.estatus)
   const hasPending = +session.restante > 0
 
+  // ── Logical consistency checks ──
+  const pagosSum    = sessionPagos.reduce((a, p) => a + (+p.monto || 0), 0)
+  const pagosDesync = sessionPagos.length > 0 && Math.abs((+session.pagos || 0) - pagosSum) > 0.01
+
+  const statusInconsistente =
+    (+session.restante === 0 || !session.restante) &&
+    +session.anticipo > 0 &&
+    ['Reservada', 'Confirmada'].includes(session.estatus)
+
   const handleAdvance = async () => {
     if (!nextSt) return
     setAdvancing(true)
@@ -59,6 +68,11 @@ export default function SessionDetails({ session, onClose, updateSession, delete
     toast(`$${amount.toLocaleString()} cobrado ✓`, 'success')
     setPayAmount('')
     setPaying(false)
+  }
+
+  const handleSyncPagos = async () => {
+    await updateSession(session.id, { pagos: String(pagosSum) })
+    toast('Pagos sincronizados', 'success')
   }
 
   const handleApplyDescuento = async () => {
@@ -161,6 +175,22 @@ export default function SessionDetails({ session, onClose, updateSession, delete
           <div className="dp-name">{session.nombre}</div>
           <div style={{ marginTop: 8 }}><Badge status={session.estatus} /></div>
         </div>
+
+        {/* ── Consistency warnings ── */}
+        {statusInconsistente && (
+          <div className="dp-alert amber">
+            <span>Sesión liquidada pero en estatus <strong>{session.estatus}</strong>. ¿Avanzar a Completada?</span>
+            <button className="btn btn-xs btn-primary" onClick={handleAdvance} disabled={advancing}>
+              {advancing ? '…' : `→ ${nextLbl || 'Completada'}`}
+            </button>
+          </div>
+        )}
+        {pagosDesync && (
+          <div className="dp-alert red">
+            <span>Pagos desincronizados — historial: <strong>${pagosSum.toLocaleString()}</strong> / registro: <strong>${(+session.pagos || 0).toLocaleString()}</strong></span>
+            <button className="btn btn-xs" onClick={handleSyncPagos}>Sincronizar</button>
+          </div>
+        )}
 
         {/* Date / Time */}
         <div className="dp-datetime">
