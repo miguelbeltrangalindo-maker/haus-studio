@@ -54,7 +54,7 @@ function AppInner() {
     }
     // Send booking confirmation via WA if configured
     if (config.wa_settings?.on_booking && result.data?.id) {
-      fetch('/api/send-confirmation', {
+      window.fetch('/api/send-confirmation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: result.data.id }),
