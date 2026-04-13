@@ -28,6 +28,25 @@ export default function Hoy({ sessions, loading, createSession, updateSession })
   const { config } = useConfig()
   const toast = useToast()
   const [modal, setModal] = useState(null)
+  const [sendingWA, setSendingWA] = useState(new Set())
+
+  const sendTemplate = async (s, e) => {
+    e.stopPropagation()
+    if (!s.telefono) { toast('Sin número de teléfono', 'error'); return }
+    setSendingWA(prev => new Set(prev).add(s.id))
+    try {
+      const res  = await fetch('/api/send-confirmation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: s.id }),
+      })
+      const data = await res.json()
+      if (data.sent)    { toast(`Plantilla enviada a ${s.nombre.split(' ')[0]}`, 'success') }
+      else if (data.skipped === 'already sent') { toast('Ya se había enviado', 'info') }
+      else              { toast('Error al enviar WA', 'error') }
+    } catch { toast('Error al enviar WA', 'error') }
+    finally { setSendingWA(prev => { const n = new Set(prev); n.delete(s.id); return n }) }
+  }
 
   const today = todayStr()
 
@@ -191,15 +210,27 @@ export default function Hoy({ sessions, loading, createSession, updateSession })
                       </button>
                     ))}
 
-                    {/* Recordatorio WA */}
-                    {['Reservada', 'Confirmada', 'Llegó'].includes(s.estatus) && (
+                    {/* Plantilla WA — envío directo via API */}
+                    {s.telefono && (
                       <button
                         className={`btn btn-wa btn-sm ${s.reminder_sent ? 'btn-ghost' : ''}`}
                         style={s.reminder_sent ? { color: 'var(--green-l)' } : {}}
-                        onClick={e => openWA(s, 'reminder', e)}
-                        title={s.reminder_sent ? 'Recordatorio ya enviado' : 'Enviar recordatorio'}
+                        disabled={sendingWA.has(s.id)}
+                        onClick={e => sendTemplate(s, e)}
+                        title="Enviar plantilla de confirmación por WhatsApp"
                       >
-                        {s.reminder_sent ? '✓ Enviado' : '📱 Recordatorio'}
+                        {sendingWA.has(s.id) ? '…' : s.reminder_sent ? '✓ WA enviado' : 'Enviar WA'}
+                      </button>
+                    )}
+
+                    {/* Recordatorio WA (mensaje libre) */}
+                    {['Reservada', 'Confirmada', 'Llegó'].includes(s.estatus) && (
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={e => openWA(s, 'reminder', e)}
+                        title="Abrir WhatsApp con mensaje de recordatorio"
+                      >
+                        📱 Mensaje
                       </button>
                     )}
 

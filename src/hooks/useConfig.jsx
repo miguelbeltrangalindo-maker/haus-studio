@@ -16,6 +16,7 @@ const DEFAULT_CONFIG = {
   blocked_dates: [],
   reminder_message: 'Hola, {nombre}. Te damos la bienvenida a HAUS. Te recordamos que tu sesión está agendada para el día {fecha} a las {hora}. Te pedimos presentarte 10 minutos antes de tu horario. La duración de tu sesión es de 20 minutos y cada espacio se agenda cada media hora para poder atender cualquier contratiempo de forma puntual. ¡Te esperamos!',
   delivery_message: 'Hola, {nombre}. Muchas gracias por visitar HAUS. Tus fotos ya están listas. Te compartimos el vínculo de entrega: {link} Gracias por confiar en nosotros.',
+  wa_on_booking: false,
   reminder_1_trigger: 'days_before',
   reminder_1_days: 1,
   reminder_2_enabled: false,
@@ -51,7 +52,7 @@ export function ConfigProvider({ children }) {
     const { extra_conceptos, closed_weekdays, blocked_dates, ...rest } = next
     const { error } = await supabase.from('config').upsert({ id: 1, ...rest })
     if (error && (error.message.includes('schema cache') || error.message.includes('column') || error.message.includes('does not exist'))) {
-      const { session_minutes, reminder_1_trigger, reminder_1_days, reminder_2_enabled, reminder_2_days, ...safe } = rest
+      const { session_minutes, wa_on_booking, reminder_1_trigger, reminder_1_days, reminder_2_enabled, reminder_2_days, ...safe } = rest
       await supabase.from('config').upsert({ id: 1, ...safe })
     }
     return next
