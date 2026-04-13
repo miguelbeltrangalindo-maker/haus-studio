@@ -243,7 +243,7 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
         </div>
 
         {/* ── Gráfica por mes ── */}
-        {monthlyData.length > 1 && (
+        {monthlyData.length > 0 && (
           <div className="stats-block">
             <div className="section-title">Sesiones e ingresos por mes</div>
             <div className="card" style={{ padding: '20px 12px 8px' }}>
