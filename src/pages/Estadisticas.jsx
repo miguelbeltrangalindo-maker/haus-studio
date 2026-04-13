@@ -4,7 +4,7 @@ import { todayStr } from '../lib/utils'
 import { useConfig } from '../hooks/useConfig'
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  PieChart, Pie, Cell, Legend,
+  PieChart, Pie, Cell, Legend, BarChart, Bar,
 } from 'recharts'
 
 export default function Estadisticas({ sessions, gastos = [], pagos = [], extras = [], extrasTableError = false }) {
@@ -116,6 +116,27 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
   const totalExtras = rangeExtras.reduce((a, e) => a + (+e.monto || 0), 0)
   const maxExtra = Math.max(...extrasEntries.map(([, m]) => m), 1)
 
+  // ── Monthly chart data (last 12 months from all sessions) ──
+  const monthlyData = (() => {
+    const map = {}
+    sessions.forEach(s => {
+      if (['Cancelada', 'No show'].includes(s.estatus)) return
+      const key = s.fecha?.slice(0, 7)
+      if (!key) return
+      if (!map[key]) map[key] = { key, sesiones: 0, ingresos: 0 }
+      map[key].sesiones++
+      map[key].ingresos += (+s.anticipo || 0) + (+s.pagos || 0)
+    })
+    return Object.values(map)
+      .sort((a, b) => a.key > b.key ? 1 : -1)
+      .slice(-12)
+      .map(d => ({
+        mes: format(parseISO(d.key + '-01'), "MMM ''yy", { locale: es }),
+        Sesiones: d.sesiones,
+        Ingresos: d.ingresos,
+      }))
+  })()
+
   // ── Chart data ──
   // Line chart: daily income over range
   const lineData = (() => {
@@ -220,6 +241,32 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
             </div>
           </div>
         </div>
+
+        {/* ── Gráfica por mes ── */}
+        {monthlyData.length > 1 && (
+          <div className="stats-block">
+            <div className="section-title">Sesiones e ingresos por mes</div>
+            <div className="card" style={{ padding: '20px 12px 8px' }}>
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={monthlyData} margin={{ top: 4, right: 20, left: 0, bottom: 4 }} barGap={4}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="mes" tick={{ fontSize: 11, fill: 'var(--text3)' }} tickLine={false} axisLine={false} />
+                  <YAxis yAxisId="ses" orientation="left"  tick={{ fontSize: 11, fill: 'var(--text3)' }} tickLine={false} axisLine={false} width={24} allowDecimals={false} />
+                  <YAxis yAxisId="ing" orientation="right" tick={{ fontSize: 11, fill: 'var(--text3)' }} tickLine={false} axisLine={false} width={48}
+                    tickFormatter={v => v === 0 ? '' : `$${(v/1000).toFixed(0)}k`} />
+                  <Tooltip
+                    contentStyle={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}
+                    labelStyle={{ color: 'var(--text2)', fontWeight: 600 }}
+                    formatter={(v, name) => [name === 'Ingresos' ? `$${v.toLocaleString()}` : v, name]}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+                  <Bar yAxisId="ses" dataKey="Sesiones" fill="#6B4FA8" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                  <Bar yAxisId="ing" dataKey="Ingresos" fill="#2D8A3A" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
 
         {/* ── Gráfica de ingresos ── */}
         {lineData.length > 1 && (

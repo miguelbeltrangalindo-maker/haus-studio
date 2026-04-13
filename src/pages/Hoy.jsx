@@ -2,6 +2,23 @@ import { useState } from 'react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { todayStr, fmtDate, initials, statusClass, nextStatus, nextStatusLabel } from '../lib/utils'
+
+const QUICK_FLOW = [
+  ['Confirmada',           'Confirmar'],
+  ['Llegó',                'Llegó'],
+  ['En sesión',            'En sesión'],
+  ['Completada',           'Completar'],
+  ['Pendiente de entrega', 'Pend. entrega'],
+  ['Entregada',            'Entregada'],
+]
+
+// Returns array of [status, label] for quick-jump buttons (up to 3 ahead)
+const getQuickActions = (estatus) => {
+  const nextSt = nextStatus(estatus)
+  const idx = QUICK_FLOW.findIndex(([s]) => s === nextSt)
+  if (idx === -1) return []
+  return QUICK_FLOW.slice(idx, idx + 3)
+}
 import { useConfig } from '../hooks/useConfig'
 import { useToast } from '../hooks/useToast'
 import Badge from '../components/Badge'
@@ -139,9 +156,8 @@ export default function Hoy({ sessions, loading, createSession, updateSession })
           </div>
         ) : (
           todaySessions.map(s => {
-            const nextSt  = nextStatus(s.estatus)
-            const nextLbl = nextStatusLabel(s.estatus)
-            const sc      = statusClass(s.estatus)
+            const sc           = statusClass(s.estatus)
+            const quickActions = getQuickActions(s.estatus)
 
             return (
               <div key={s.id} className={`hoy-item ${sc}`}>
@@ -164,15 +180,16 @@ export default function Hoy({ sessions, loading, createSession, updateSession })
                   )}
 
                   <div className="hoy-actions">
-                    {/* Acción principal: avanzar estado */}
-                    {nextSt && (
+                    {/* Quick status buttons — primary for next, ghost for skip-ahead */}
+                    {quickActions.map(([st, lbl], i) => (
                       <button
-                        className="btn btn-primary btn-sm"
-                        onClick={() => handleQuick(s, nextSt)}
+                        key={st}
+                        className={`btn btn-sm ${i === 0 ? 'btn-primary' : 'btn-ghost'}`}
+                        onClick={() => handleQuick(s, st)}
                       >
-                        {nextLbl}
+                        {lbl}
                       </button>
-                    )}
+                    ))}
 
                     {/* Recordatorio WA */}
                     {['Reservada', 'Confirmada', 'Llegó'].includes(s.estatus) && (
