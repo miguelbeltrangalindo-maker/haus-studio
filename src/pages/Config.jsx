@@ -3,6 +3,16 @@ import { format, addDays } from 'date-fns'
 import { useConfig } from '../hooks/useConfig'
 import { useToast } from '../hooks/useToast'
 
+const DIAS_SEMANA = [
+  { label: 'Dom', value: 0 },
+  { label: 'Lun', value: 1 },
+  { label: 'Mar', value: 2 },
+  { label: 'Mié', value: 3 },
+  { label: 'Jue', value: 4 },
+  { label: 'Vie', value: 5 },
+  { label: 'Sáb', value: 6 },
+]
+
 export default function Config() {
   const { config, updateConfig } = useConfig()
   const toast = useToast()
@@ -11,13 +21,32 @@ export default function Config() {
   const [newConcepto, setNewConcepto] = useState('')
   const [newPrecio, setNewPrecio]     = useState('')
   const [addingC, setAddingC]         = useState(false)
-  const [editingPrices, setEditingPrices] = useState({}) // { [id]: precio_string }
+  const [editingPrices, setEditingPrices] = useState({})
+  const [newBlockedDate, setNewBlockedDate] = useState('') // { [id]: precio_string }
 
   useEffect(() => { setForm(config) }, [config])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  const conceptos = form.extra_conceptos || []
+  const conceptos       = form.extra_conceptos  || []
+  const closedWeekdays  = form.closed_weekdays  || []
+  const blockedDates    = form.blocked_dates    || []
+
+  const toggleWeekday = (val) => {
+    const next = closedWeekdays.includes(val)
+      ? closedWeekdays.filter(d => d !== val)
+      : [...closedWeekdays, val].sort()
+    set('closed_weekdays', next)
+  }
+
+  const addBlockedDate = () => {
+    if (!newBlockedDate) return
+    if (blockedDates.includes(newBlockedDate)) { toast('Esa fecha ya está bloqueada', 'error'); return }
+    set('blocked_dates', [...blockedDates, newBlockedDate].sort())
+    setNewBlockedDate('')
+  }
+
+  const removeBlockedDate = (d) => set('blocked_dates', blockedDates.filter(x => x !== d))
 
   const handleAddConcepto = () => {
     if (!newConcepto.trim()) { toast('Ingresa un nombre', 'error'); return }
@@ -244,6 +273,59 @@ export default function Config() {
             ) : (
               <button className="btn btn-ghost btn-sm" onClick={() => setAddingC(true)}>+ Nuevo concepto</button>
             )}
+          </div>
+
+          <div className="config-section">
+            <div className="config-title">Días cerrados</div>
+            <div style={{ marginBottom: 14, fontSize: 13, color: 'var(--text3)' }}>
+              Bloquea días de la semana o fechas específicas. No se podrán agendar sesiones en esos días.
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 16 }}>
+              <label className="form-label">Días de la semana siempre cerrados</label>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+                {DIAS_SEMANA.map(d => (
+                  <button
+                    key={d.value}
+                    type="button"
+                    className={`method-tab${closedWeekdays.includes(d.value) ? ' active' : ''}`}
+                    onClick={() => toggleWeekday(d.value)}
+                    style={closedWeekdays.includes(d.value) ? { background: 'var(--red)', borderColor: 'var(--red)', color: '#fff' } : {}}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Fechas específicas bloqueadas</label>
+              <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                <input
+                  className="form-input"
+                  type="date"
+                  value={newBlockedDate}
+                  onChange={e => setNewBlockedDate(e.target.value)}
+                  style={{ flex: 1 }}
+                />
+                <button className="btn btn-sm btn-primary" onClick={addBlockedDate}>Bloquear</button>
+              </div>
+              {blockedDates.length > 0 && (
+                <div className="card" style={{ padding: '10px 16px', marginTop: 10 }}>
+                  {blockedDates.map(d => (
+                    <div key={d} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBlock: 6, borderBottom: '1px solid var(--border)' }}>
+                      <span style={{ fontSize: 14 }}>
+                        {new Date(d + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                      </span>
+                      <button
+                        onClick={() => removeBlockedDate(d)}
+                        style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 16 }}
+                      >×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div style={{ paddingTop: 8 }}>

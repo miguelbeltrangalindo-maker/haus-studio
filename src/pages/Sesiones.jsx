@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, format } from 'date-fns'
 import { todayStr, tomorrowStr, initials, fmtDate, ALL_STATUSES } from '../lib/utils'
 import { useToast } from '../hooks/useToast'
 import Badge from '../components/Badge'
@@ -6,14 +7,17 @@ import SessionModal from '../components/SessionModal'
 import { useConfig } from '../hooks/useConfig'
 
 const QUICK = [
-  { label: 'Todas',              key: '' },
-  { label: 'Hoy',                key: 'hoy' },
-  { label: 'Mañana',             key: 'manana' },
-  { label: 'En sesión',          key: 'en-sesion' },
-  { label: 'Pend. de entrega',   key: 'pendiente' },
-  { label: 'Pend. de pago',      key: 'pago' },
-  { label: 'Entregadas',         key: 'entregada' },
-  { label: 'Canceladas',         key: 'cancelada' },
+  { label: 'Todas',            key: '' },
+  { label: 'Hoy',              key: 'hoy' },
+  { label: 'Mañana',           key: 'manana' },
+  { label: 'Esta semana',      key: 'semana' },
+  { label: 'Este mes',         key: 'mes' },
+  { label: 'En sesión',        key: 'en-sesion' },
+  { label: 'Pend. de entrega', key: 'pendiente' },
+  { label: 'Pend. de pago',    key: 'pago' },
+  { label: 'Entregadas',       key: 'entregada' },
+  { label: 'Canceladas',       key: 'cancelada' },
+  { label: 'Rango',            key: 'rango' },
 ]
 
 export default function Sesiones({ sessions, loading, createSession, updateSession, onSelectSession }) {
@@ -21,7 +25,15 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
   const { config } = useConfig()
   const [search, setSearch] = useState('')
   const [quick,  setQuick]  = useState('')
+  const [rangeFrom, setRangeFrom] = useState('')
+  const [rangeTo,   setRangeTo]   = useState('')
   const [modal,  setModal]  = useState(null)
+
+  const today = todayStr()
+  const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd')
+  const weekEnd   = format(endOfWeek(new Date(),   { weekStartsOn: 1 }), 'yyyy-MM-dd')
+  const monthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd')
+  const monthEnd   = format(endOfMonth(new Date()),   'yyyy-MM-dd')
 
   const filtered = useMemo(() => {
     let list = [...sessions]
@@ -32,15 +44,47 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
         s.telefono?.includes(search)
       )
     }
-    if (quick === 'hoy')       list = list.filter(s => s.fecha === todayStr())
+    if (quick === 'hoy')       list = list.filter(s => s.fecha === today)
     if (quick === 'manana')    list = list.filter(s => s.fecha === tomorrowStr())
+    if (quick === 'semana')    list = list.filter(s => s.fecha >= weekStart && s.fecha <= weekEnd)
+    if (quick === 'mes')       list = list.filter(s => s.fecha >= monthStart && s.fecha <= monthEnd)
     if (quick === 'en-sesion') list = list.filter(s => s.estatus === 'En sesión')
     if (quick === 'pendiente') list = list.filter(s => s.estatus === 'Pendiente de entrega')
     if (quick === 'pago')      list = list.filter(s => +s.restante > 0)
     if (quick === 'entregada') list = list.filter(s => s.estatus === 'Entregada')
     if (quick === 'cancelada') list = list.filter(s => s.estatus === 'Cancelada')
+    if (quick === 'rango') {
+      if (rangeFrom) list = list.filter(s => s.fecha >= rangeFrom)
+      if (rangeTo)   list = list.filter(s => s.fecha <= rangeTo)
+    }
     return list.sort((a, b) => (a.fecha + (a.hora || '')) < (b.fecha + (b.hora || '')) ? 1 : -1)
-  }, [sessions, search, quick])
+  }, [sessions, search, quick, rangeFrom, rangeTo, today, weekStart, weekEnd, monthStart, monthEnd])
+
+  const exportCSV = () => {
+    const headers = ['Nombre','Teléfono','Fecha','Hora','Personas','Estatus','Anticipo','Método anticipo','Pagos cobrados','Saldo pendiente','Descuento','Notas']
+    const rows = filtered.map(s => [
+      s.nombre || '',
+      s.telefono || '',
+      s.fecha || '',
+      s.hora?.slice(0, 5) || '',
+      s.personas || '',
+      s.estatus || '',
+      s.anticipo || 0,
+      s.metodo_anticipo || '',
+      s.pagos || 0,
+      s.restante || 0,
+      s.descuento || 0,
+      (s.notas || '').replace(/,/g, ';').replace(/\n/g, ' '),
+    ])
+    const csv = [headers, ...rows].map(r => r.join(',')).join('\n')
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `sesiones-${today}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   const handleSave = async (form) => {
     let result
@@ -84,6 +128,9 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
       <div className="topbar">
         <div className="topbar-title">Sesiones</div>
         <div className="topbar-right">
+          <button className="btn btn-ghost btn-sm" onClick={exportCSV} title="Exportar CSV">
+            ↓ CSV
+          </button>
           <button className="btn btn-primary btn-sm" onClick={() => setModal({})}>+ Nueva sesión</button>
         </div>
       </div>
@@ -99,7 +146,7 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
             onChange={e => setSearch(e.target.value)}
           />
           {(search || quick) && (
-            <button className="btn btn-sm" onClick={() => { setSearch(''); setQuick('') }}>
+            <button className="btn btn-sm" onClick={() => { setSearch(''); setQuick(''); setRangeFrom(''); setRangeTo('') }}>
               Limpiar
             </button>
           )}
@@ -117,6 +164,20 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
             </button>
           ))}
         </div>
+
+        {/* Rango personalizado */}
+        {quick === 'rango' && (
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
+            <input className="form-input" type="date" value={rangeFrom}
+              onChange={e => setRangeFrom(e.target.value)}
+              style={{ width: 160 }} placeholder="Desde" />
+            <span style={{ color: 'var(--text3)', fontSize: 13 }}>—</span>
+            <input className="form-input" type="date" value={rangeTo}
+              onChange={e => setRangeTo(e.target.value)}
+              min={rangeFrom}
+              style={{ width: 160 }} placeholder="Hasta" />
+          </div>
+        )}
 
         {/* Resultado */}
         <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12 }}>

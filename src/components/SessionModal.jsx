@@ -71,6 +71,16 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
         toast('No puedes agendar sesiones en el pasado', 'error'); return
       }
     }
+    const dayOfWeek = new Date(form.fecha + 'T12:00:00').getDay()
+    const closedWeekdays = config.closed_weekdays || []
+    const blockedDates   = config.blocked_dates   || []
+    const DIAS = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado']
+    if (closedWeekdays.includes(dayOfWeek)) {
+      toast(`El estudio está cerrado los ${DIAS[dayOfWeek]}`, 'error'); return
+    }
+    if (blockedDates.includes(form.fecha)) {
+      toast('Esa fecha está bloqueada', 'error'); return
+    }
     if (+form.anticipo > 0 && !form.metodo_anticipo) {
       toast('Selecciona el método del anticipo', 'error'); return
     }

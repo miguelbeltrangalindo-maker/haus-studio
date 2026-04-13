@@ -20,7 +20,7 @@ export default function Hoy({ sessions, loading, createSession, updateSession })
 
   const completadas  = todaySessions.filter(s => ['Completada', 'Entregada', 'Pendiente de entrega'].includes(s.estatus)).length
   const pendientes   = todaySessions.filter(s => ['Reservada', 'Confirmada', 'Llegó', 'En sesión'].includes(s.estatus)).length
-  const cobrado      = todaySessions.reduce((a, s) => a + (+s.anticipo || 0), 0)
+  const cobrado      = todaySessions.reduce((a, s) => a + (+s.anticipo || 0) + (+s.pagos || 0), 0)
   const porCobrar    = todaySessions.reduce((a, s) => a + (+s.restante || 0), 0)
 
   const dateLabel = format(new Date(), "EEEE, d 'de' MMMM yyyy", { locale: es })

@@ -416,6 +416,12 @@ export default function SessionDetails({ session, onClose, updateSession, delete
             <span className="dp-meta-label">Personas</span>
             <span className="dp-meta-value">{session.personas}</span>
           </div>
+          {(+session.ninos > 0) && (
+            <div className="dp-meta-row">
+              <span className="dp-meta-label">Niños &lt;2 años</span>
+              <span className="dp-meta-value">{session.ninos}</span>
+            </div>
+          )}
           {session.telefono && (
             <div className="dp-meta-row">
               <span className="dp-meta-label">Teléfono</span>

@@ -8,6 +8,7 @@ import Sesiones from './pages/Sesiones'
 import Gastos from './pages/Gastos'
 import Estadisticas from './pages/Estadisticas'
 import Config from './pages/Config'
+import Clientes from './pages/Clientes'
 import SessionDetails from './components/SessionDetails'
 import { ToastProvider } from './hooks/useToast'
 import { ConfigProvider, useConfig } from './hooks/useConfig'
@@ -18,7 +19,7 @@ import { useExtras } from './hooks/useExtras'
 
 function AppInner() {
   const { sessions, loading, createSession, updateSession, deleteSession, fetch } = useSessions()
-  const { gastos, loading: gastosLoading, tableError, createGasto, deleteGasto } = useGastos()
+  const { gastos, loading: gastosLoading, tableError, createGasto, updateGasto, deleteGasto } = useGastos()
   const { pagos, createPago } = usePagos()
   const { extras, createExtra, updateExtra, deleteExtra, tableError: extrasTableError } = useExtras()
   const { config } = useConfig()
@@ -64,7 +65,8 @@ function AppInner() {
           <Route path="/hoy"           element={<Hoy          {...shared} />} />
           <Route path="/agenda"        element={<Agenda       {...shared} />} />
           <Route path="/sesiones"      element={<Sesiones     {...shared} />} />
-          <Route path="/gastos"        element={<Gastos gastos={gastos} loading={gastosLoading} tableError={tableError} createGasto={createGasto} deleteGasto={deleteGasto} />} />
+          <Route path="/clientes"      element={<Clientes sessions={sessions} loading={loading} onSelectSession={onSelectSession} />} />
+          <Route path="/gastos"        element={<Gastos gastos={gastos} loading={gastosLoading} tableError={tableError} createGasto={createGasto} updateGasto={updateGasto} deleteGasto={deleteGasto} />} />
           <Route path="/estadisticas"  element={<Estadisticas sessions={sessions} gastos={gastos} pagos={pagos} extras={extras} extrasTableError={extrasTableError} />} />
           <Route path="/config"        element={<Config />} />
         </Routes>

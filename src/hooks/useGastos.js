@@ -31,6 +31,14 @@ export function useGastos() {
     return { data }
   }
 
+  const updateGasto = async (id, updates) => {
+    const { data, error } = await supabase
+      .from('gastos').update(updates).eq('id', id).select().single()
+    if (error) return { error: error.message }
+    setGastos(prev => prev.map(g => g.id === id ? data : g))
+    return { data }
+  }
+
   const deleteGasto = async (id) => {
     const { error } = await supabase.from('gastos').delete().eq('id', id)
     if (error) return { error: error.message }
@@ -38,5 +46,5 @@ export function useGastos() {
     return {}
   }
 
-  return { gastos, loading, tableError, createGasto, deleteGasto, fetch: fetchGastos }
+  return { gastos, loading, tableError, createGasto, updateGasto, deleteGasto, fetch: fetchGastos }
 }

@@ -43,6 +43,14 @@ const IconCog = () => (
     <path d="M8 1.5v1.5M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/>
   </svg>
 )
+const IconPeople = () => (
+  <svg className="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <circle cx="6" cy="4.5" r="2.5"/>
+    <path d="M1 13c0-2.76 2.24-5 5-5s5 2.24 5 5"/>
+    <circle cx="12" cy="5" r="2"/>
+    <path d="M14.5 13c0-2.21-1.12-4-2.5-4"/>
+  </svg>
+)
 
 const navLink = ({ isActive }) => `nav-item ${isActive ? 'active' : ''}`
 
@@ -66,6 +74,9 @@ export default function Sidebar() {
         </NavLink>
         <NavLink to="/sesiones" className={navLink}>
           <IconList /><span>Sesiones</span>
+        </NavLink>
+        <NavLink to="/clientes" className={navLink}>
+          <IconPeople /><span>Clientes</span>
         </NavLink>
         <NavLink to="/gastos" className={({ isActive }) => `nav-item nav-item-gastos ${isActive ? 'active' : ''}`}>
           <IconReceipt /><span>Gastos</span>
