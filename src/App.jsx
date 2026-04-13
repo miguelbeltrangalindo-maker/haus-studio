@@ -52,6 +52,14 @@ function AppInner() {
         await createExtra(result.data.id, concepto.nombre, monto, extra, +concepto.precio_unitario || 0)
       }
     }
+    // Send booking confirmation via WA if configured
+    if (config.reminder_1_trigger === 'on_booking' && result.data?.id) {
+      fetch('/api/send-confirmation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: result.data.id }),
+      }).catch(() => {}) // fire-and-forget, don't block the UI
+    }
     return result
   }
 

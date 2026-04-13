@@ -163,6 +163,70 @@ export default function Config() {
           </div>
 
           <div className="config-section">
+            <div className="config-title">Recordatorios de WhatsApp</div>
+            <div style={{ marginBottom: 14, fontSize: 13, color: 'var(--text3)' }}>
+              Configura cuándo se envían los mensajes automáticos a tus clientes.
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 20 }}>
+              <label className="form-label">Primer recordatorio</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 8 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                  <input type="radio" name="r1_trigger" value="on_booking"
+                    checked={form.reminder_1_trigger === 'on_booking'}
+                    onChange={() => set('reminder_1_trigger', 'on_booking')} />
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 500 }}>Al agendar la sesión</div>
+                    <div style={{ fontSize: 12, color: 'var(--text3)' }}>Se envía en el momento en que creas la sesión</div>
+                  </div>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                  <input type="radio" name="r1_trigger" value="days_before"
+                    checked={form.reminder_1_trigger !== 'on_booking'}
+                    onChange={() => set('reminder_1_trigger', 'days_before')} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 14, fontWeight: 500 }}>Días antes:</span>
+                    <select
+                      className="form-input"
+                      style={{ width: 'auto', padding: '4px 10px', fontSize: 13 }}
+                      value={form.reminder_1_days ?? 1}
+                      disabled={form.reminder_1_trigger === 'on_booking'}
+                      onChange={e => set('reminder_1_days', +e.target.value)}
+                    >
+                      <option value={1}>1 día antes</option>
+                      <option value={2}>2 días antes</option>
+                    </select>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: 12 }}>
+                <input type="checkbox"
+                  checked={!!form.reminder_2_enabled}
+                  onChange={e => set('reminder_2_enabled', e.target.checked)} />
+                <span style={{ fontSize: 14, fontWeight: 500 }}>Activar segundo recordatorio</span>
+              </label>
+              {form.reminder_2_enabled && (
+                <div style={{ paddingLeft: 28 }}>
+                  <label className="form-label" style={{ marginBottom: 6 }}>Enviar el segundo recordatorio:</label>
+                  <select
+                    className="form-input"
+                    style={{ maxWidth: 220 }}
+                    value={form.reminder_2_days ?? 0}
+                    onChange={e => set('reminder_2_days', +e.target.value)}
+                  >
+                    <option value={0}>El mismo día de la sesión</option>
+                    <option value={1}>1 día antes</option>
+                    <option value={2}>2 días antes</option>
+                  </select>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="config-section">
             <div className="config-title">Mensaje de recordatorio — WhatsApp</div>
             <div style={{ marginBottom: 12, fontSize: 13, color: 'var(--text3)' }}>
               Variables: <code style={{ background: 'var(--bg3)', padding: '2px 6px', borderRadius: 4 }}>{'{nombre}'}</code>{' '}

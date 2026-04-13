@@ -1,9 +1,17 @@
 import { createClient } from '@supabase/supabase-js'
 
 export default async function handler(req, res) {
-  // Only allow GET (Vercel cron) or POST with secret for manual trigger
   if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
+  }
+
+  // Validate Vercel cron secret to prevent unauthorized external calls
+  const cronSecret = process.env.CRON_SECRET
+  if (cronSecret) {
+    const authHeader = req.headers['authorization']
+    if (authHeader !== `Bearer ${cronSecret}`) {
+      return res.status(401).json({ error: 'Unauthorized' })
+    }
   }
 
   const supabase = createClient(
@@ -11,45 +19,30 @@ export default async function handler(req, res) {
     process.env.SUPABASE_SERVICE_KEY
   )
 
-  // Tomorrow's date in YYYY-MM-DD
-  const tomorrow = new Date()
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  const tomorrowStr = tomorrow.toISOString().split('T')[0]
+  // Read reminder config
+  const { data: configRow } = await supabase
+    .from('config')
+    .select('reminder_1_trigger, reminder_1_days, reminder_2_enabled, reminder_2_days')
+    .eq('id', 1)
+    .single()
 
-  // Sessions tomorrow that haven't been reminded, not cancelled
-  const { data: sessions, error } = await supabase
-    .from('sessions')
-    .select('id, nombre, telefono, fecha, hora, estatus')
-    .eq('fecha', tomorrowStr)
-    .eq('reminder_sent', false)
-    .not('estatus', 'in', '("Cancelada","No show")')
-
-  if (error) {
-    console.error('Supabase error:', error)
-    return res.status(500).json({ error: error.message })
-  }
-
-  if (!sessions || sessions.length === 0) {
-    return res.status(200).json({ message: 'No sessions tomorrow', sent: 0 })
-  }
+  const r1Trigger  = configRow?.reminder_1_trigger ?? 'days_before'
+  const r1Days     = configRow?.reminder_1_days    ?? 1
+  const r2Enabled  = configRow?.reminder_2_enabled ?? false
+  const r2Days     = configRow?.reminder_2_days    ?? 0
 
   const templateName = process.env.WHATSAPP_TEMPLATE_NAME
-  const phoneId     = process.env.WHATSAPP_PHONE_ID
-  const token       = process.env.WHATSAPP_TOKEN
+  const phoneId      = process.env.WHATSAPP_PHONE_ID
+  const token        = process.env.WHATSAPP_TOKEN
 
   if (!templateName || !phoneId || !token) {
     return res.status(500).json({ error: 'Missing WhatsApp environment variables' })
   }
 
-  // Format date in Spanish: "lunes 14 de abril"
-  const fechaDate = new Date(tomorrowStr + 'T12:00:00')
-  const fechaStr  = fechaDate.toLocaleDateString('es-MX', {
-    weekday: 'long', day: 'numeric', month: 'long'
-  })
-
   const results = []
 
-  for (const session of sessions) {
+  // ── Helper: send one WA message ──
+  const sendWA = async (session, dateLabel) => {
     const phone   = '52' + session.telefono.replace(/\D/g, '').replace(/^52/, '')
     const horaStr = session.hora?.slice(0, 5) || ''
 
@@ -64,46 +57,94 @@ export default async function handler(req, res) {
           type: 'body',
           parameters: [
             { type: 'text', text: session.nombre },
-            { type: 'text', text: fechaStr },
+            { type: 'text', text: dateLabel },
             { type: 'text', text: horaStr },
           ]
         }]
       }
     }
 
-    try {
-      const waRes = await fetch(
-        `https://graph.facebook.com/v25.0/${phoneId}/messages`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
+    const waRes  = await fetch(`https://graph.facebook.com/v25.0/${phoneId}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify(payload),
+    })
+    const waData = await waRes.json()
+    return { ok: waRes.ok, waData }
+  }
+
+  // ── Helper: date string N days from today ──
+  const dateStrDaysFromNow = (n) => {
+    const d = new Date()
+    d.setDate(d.getDate() + n)
+    return d.toISOString().split('T')[0]
+  }
+
+  // ── Helper: Spanish date label ──
+  const spanishDate = (dateStr) =>
+    new Date(dateStr + 'T12:00:00').toLocaleDateString('es-MX', {
+      weekday: 'long', day: 'numeric', month: 'long'
+    })
+
+  // ── Reminder 1 (scheduled mode only — on_booking is handled at creation) ──
+  if (r1Trigger === 'days_before') {
+    const targetDate = dateStrDaysFromNow(r1Days)
+    const { data: sessions1 } = await supabase
+      .from('sessions')
+      .select('id, nombre, telefono, fecha, hora')
+      .eq('fecha', targetDate)
+      .eq('reminder_sent', false)
+      .not('estatus', 'in', '("Cancelada","No show")')
+
+    for (const session of (sessions1 || [])) {
+      if (!session.telefono) continue
+      try {
+        const { ok, waData } = await sendWA(session, spanishDate(session.fecha))
+        if (ok) {
+          console.log(`R1 sent: ${session.nombre}, msg_id: ${waData.messages?.[0]?.id}`)
+          await supabase.from('sessions').update({ reminder_sent: true }).eq('id', session.id)
+          results.push({ type: 'r1', nombre: session.nombre, status: 'sent' })
+        } else {
+          console.error(`R1 error for session ${session.id}: code=${waData.error?.code}`)
+          results.push({ type: 'r1', nombre: session.nombre, status: 'error', code: waData.error?.code })
         }
-      )
-
-      const waData = await waRes.json()
-      console.log(`WA response for ${session.nombre} (${phone}):`, JSON.stringify(waData))
-
-      if (waRes.ok) {
-        await supabase
-          .from('sessions')
-          .update({ reminder_sent: true })
-          .eq('id', session.id)
-        results.push({ nombre: session.nombre, phone, status: 'sent' })
-      } else {
-        console.error(`WA error for ${session.nombre}:`, JSON.stringify(waData))
-        results.push({ nombre: session.nombre, phone, status: 'error', detail: waData })
+      } catch (err) {
+        console.error(`R1 exception for session ${session.id}:`, err.message)
+        results.push({ type: 'r1', nombre: session.nombre, status: 'exception' })
       }
-    } catch (err) {
-      results.push({ nombre: session.nombre, phone, status: 'exception', detail: err.message })
+    }
+  }
+
+  // ── Reminder 2 ──
+  if (r2Enabled) {
+    const targetDate = dateStrDaysFromNow(r2Days)
+    const { data: sessions2 } = await supabase
+      .from('sessions')
+      .select('id, nombre, telefono, fecha, hora')
+      .eq('fecha', targetDate)
+      .eq('reminder_2_sent', false)
+      .not('estatus', 'in', '("Cancelada","No show")')
+
+    for (const session of (sessions2 || [])) {
+      if (!session.telefono) continue
+      try {
+        const { ok, waData } = await sendWA(session, spanishDate(session.fecha))
+        if (ok) {
+          console.log(`R2 sent: ${session.nombre}, msg_id: ${waData.messages?.[0]?.id}`)
+          await supabase.from('sessions').update({ reminder_2_sent: true }).eq('id', session.id)
+          results.push({ type: 'r2', nombre: session.nombre, status: 'sent' })
+        } else {
+          console.error(`R2 error for session ${session.id}: code=${waData.error?.code}`)
+          results.push({ type: 'r2', nombre: session.nombre, status: 'error', code: waData.error?.code })
+        }
+      } catch (err) {
+        console.error(`R2 exception for session ${session.id}:`, err.message)
+        results.push({ type: 'r2', nombre: session.nombre, status: 'exception' })
+      }
     }
   }
 
   return res.status(200).json({
-    date: tomorrowStr,
     sent: results.filter(r => r.status === 'sent').length,
     errors: results.filter(r => r.status !== 'sent').length,
     results,
