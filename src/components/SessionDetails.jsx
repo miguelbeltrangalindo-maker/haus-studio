@@ -18,6 +18,7 @@ export default function SessionDetails({ session, onClose, updateSession, delete
   const toast = useToast()
   const [editOpen, setEditOpen]   = useState(false)
   const [advancing, setAdvancing] = useState(false)
+  const [syncing, setSyncing]     = useState(false)
   const [payAmount, setPayAmount] = useState('')
   const [payMethod, setPayMethod] = useState('efectivo')
   const [paying, setPaying]       = useState(false)
@@ -54,6 +55,7 @@ export default function SessionDetails({ session, onClose, updateSession, delete
     const amount = +payAmount
     if (!amount || amount <= 0) { toast('Ingresa un monto válido', 'error'); return }
     const currentRestante = +session.restante || 0
+    if (amount > currentRestante) { toast(`El monto no puede superar $${currentRestante.toLocaleString()}`, 'error'); return }
     const newRestante = Math.max(0, currentRestante - amount)
     const updates = {
       restante:    String(newRestante),
@@ -71,8 +73,11 @@ export default function SessionDetails({ session, onClose, updateSession, delete
   }
 
   const handleSyncPagos = async () => {
-    await updateSession(session.id, { pagos: String(pagosSum) })
-    toast('Pagos sincronizados', 'success')
+    setSyncing(true)
+    const result = await updateSession(session.id, { pagos: String(pagosSum) })
+    if (result.error) toast(result.error, 'error')
+    else toast('Pagos sincronizados', 'success')
+    setSyncing(false)
   }
 
   const handleApplyDescuento = async () => {
@@ -101,8 +106,9 @@ export default function SessionDetails({ session, onClose, updateSession, delete
     let totalMonto = 0
     for (const c of toAdd) {
       const qty = extraQtys[c.id]
-      const monto = qty * c.precio_unitario
-      const result = await createExtra(session.id, c.nombre, monto, qty, c.precio_unitario)
+      const precio = c.precio_unitario || 0
+      const monto = qty * precio
+      const result = await createExtra(session.id, c.nombre, monto, qty, precio)
       if (result.error) { toast(result.error, 'error'); setApplyingExtras(false); return }
       totalMonto += monto
     }
@@ -156,7 +162,8 @@ export default function SessionDetails({ session, onClose, updateSession, delete
 
   const handleDeletePermanent = async () => {
     if (!confirm(`¿Eliminar permanentemente la sesión de ${session.nombre}?\n\nSe borrarán todos los pagos y cargos asociados. Esta acción no se puede deshacer.`)) return
-    await deleteSession(session.id)
+    const result = await deleteSession(session.id)
+    if (result?.error) { toast(result.error, 'error'); return }
     toast('Sesión eliminada', 'success')
     onClose()
   }
@@ -188,7 +195,7 @@ export default function SessionDetails({ session, onClose, updateSession, delete
         {pagosDesync && (
           <div className="dp-alert red">
             <span>Pagos desincronizados — historial: <strong>${pagosSum.toLocaleString()}</strong> / registro: <strong>${(+session.pagos || 0).toLocaleString()}</strong></span>
-            <button className="btn btn-xs" onClick={handleSyncPagos}>Sincronizar</button>
+            <button className="btn btn-xs" onClick={handleSyncPagos} disabled={syncing}>{syncing ? '…' : 'Sincronizar'}</button>
           </div>
         )}
 
@@ -281,7 +288,7 @@ export default function SessionDetails({ session, onClose, updateSession, delete
                   return (
                     <div key={c.id} className="dp-meta-row" style={{ paddingBlock: 7 }}>
                       <span className="dp-meta-label">{c.nombre}
-                        <span style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 4 }}>${c.precio_unitario.toLocaleString()}/u</span>
+                        <span style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 4 }}>${(c.precio_unitario || 0).toLocaleString()}/u</span>
                       </span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                         {subtotal > 0 && <span style={{ fontSize: 11, color: 'var(--amber-l)', marginRight: 4 }}>${subtotal.toLocaleString()}</span>}
@@ -293,7 +300,7 @@ export default function SessionDetails({ session, onClose, updateSession, delete
                   )
                 })}
                 {Object.values(extraQtys).some(q => q > 0) && (() => {
-                  const total = conceptos.reduce((s, c) => s + (extraQtys[c.id] || 0) * c.precio_unitario, 0)
+                  const total = conceptos.reduce((s, c) => s + (extraQtys[c.id] || 0) * (c.precio_unitario || 0), 0)
                   return (
                     <button className="btn btn-primary btn-sm" onClick={handleApplyExtras} disabled={applyingExtras}
                       style={{ width: '100%', marginTop: 8 }}>
