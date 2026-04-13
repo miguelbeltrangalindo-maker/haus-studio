@@ -207,13 +207,13 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
               onChange={e => set('nombre', e.target.value)}
               placeholder="Nombre del cliente"
               onFocus={() => setNameFocused(true)}
-              onBlur={() => setTimeout(() => setNameFocused(false), 200)}
+              onBlur={() => setTimeout(() => setNameFocused(false), 300)}
               autoComplete="off"
             />
             {suggestions.length > 0 && (
               <div className="client-suggestions">
                 {suggestions.map((c, i) => (
-                  <div key={i} className="client-suggestion" onMouseDown={() => selectClient(c)}>
+                  <div key={i} className="client-suggestion" onPointerDown={() => selectClient(c)}>
                     <div className="client-suggestion-name">{c.nombre}</div>
                     <div className="client-suggestion-meta">
                       {c.telefono}
