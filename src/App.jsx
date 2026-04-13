@@ -10,7 +10,7 @@ import Estadisticas from './pages/Estadisticas'
 import Config from './pages/Config'
 import Clientes from './pages/Clientes'
 import SessionDetails from './components/SessionDetails'
-import { ToastProvider } from './hooks/useToast'
+import { ToastProvider, useToast } from './hooks/useToast'
 import { ConfigProvider, useConfig } from './hooks/useConfig'
 import { useSessions } from './hooks/useSessions'
 import { useGastos } from './hooks/useGastos'
@@ -23,6 +23,7 @@ function AppInner() {
   const { pagos, createPago } = usePagos()
   const { extras, createExtra, updateExtra, deleteExtra, tableError: extrasTableError } = useExtras()
   const { config } = useConfig()
+  const toast = useToast()
   const [selectedId, setSelectedId] = useState(null)
   const location = useLocation()
 
@@ -54,11 +55,18 @@ function AppInner() {
     }
     // Send booking confirmation via WA if configured
     if (config.wa_settings?.on_booking && result.data?.id) {
-      window.fetch('/api/send-confirmation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: result.data.id }),
-      }).catch(() => {}) // fire-and-forget, don't block the UI
+      try {
+        const waRes  = await window.fetch('/api/send-confirmation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: result.data.id }),
+        })
+        const waData = await waRes.json()
+        if (waData.sent)              toast('WA enviado al cliente', 'success')
+        else if (waData.skipped)      toast(`WA omitido: ${waData.skipped}`, 'info')
+        else if (waData.code)         toast(`WA error ${waData.code}`, 'error')
+        else if (!result.data.telefono) toast('Sin teléfono — WA no enviado', 'info')
+      } catch { toast('WA: error de red', 'error') }
     }
     return result
   }
