@@ -261,7 +261,7 @@ export default function DashboardDesktop({
         )}
       </div>
 
-      {modal && <SessionModal onSave={handleCreate} onClose={() => setModal(false)} />}
+      {modal && <SessionModal onSave={handleCreate} onClose={() => setModal(false)} sessions={sessions} />}
     </>
   )
 }

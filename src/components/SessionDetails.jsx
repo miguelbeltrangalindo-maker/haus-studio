@@ -13,7 +13,7 @@ const METHODS = [
 
 const METHOD_LABEL = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta' }
 
-export default function SessionDetails({ session, onClose, updateSession, deleteSession, sessionPagos = [], createPago, sessionExtras = [], createExtra, deleteExtra }) {
+export default function SessionDetails({ session, onClose, updateSession, deleteSession, sessionPagos = [], createPago, sessionExtras = [], createExtra, updateExtra, deleteExtra, sessions = [] }) {
   const { config } = useConfig()
   const toast = useToast()
   const [editOpen, setEditOpen]   = useState(false)
@@ -512,6 +512,7 @@ export default function SessionDetails({ session, onClose, updateSession, delete
           onSave={handleSave}
           onClose={() => setEditOpen(false)}
           onDelete={handleDelete}
+          sessions={sessions}
         />
       )}
     </>

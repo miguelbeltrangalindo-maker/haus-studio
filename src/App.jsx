@@ -100,6 +100,7 @@ function AppInner() {
           createExtra={createExtra}
           updateExtra={updateExtra}
           deleteExtra={deleteExtra}
+          sessions={sessions}
         />
       )}
     </div>
