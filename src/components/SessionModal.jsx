@@ -197,7 +197,7 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
         {/* Contacto */}
         <div className="modal-section-title">Contacto</div>
         <div className="form-grid">
-          <div className="form-group" style={{ position: 'relative' }}>
+          <div className="form-group">
             <label className="form-label">Nombre completo *</label>
             <input
               className="form-input"
@@ -205,7 +205,7 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
               onChange={e => set('nombre', e.target.value)}
               placeholder="Nombre del cliente"
               onFocus={() => setNameFocused(true)}
-              onBlur={() => setTimeout(() => setNameFocused(false), 150)}
+              onBlur={() => setTimeout(() => setNameFocused(false), 200)}
               autoComplete="off"
             />
             {suggestions.length > 0 && (
