@@ -26,7 +26,11 @@ export function ConfigProvider({ children }) {
   useEffect(() => {
     supabase.from('config').select('*').eq('id', 1).single()
       .then(({ data }) => {
-        if (data) setConfig({ ...DEFAULT_CONFIG, ...data })
+        if (data) setConfig({
+          ...DEFAULT_CONFIG,
+          ...data,
+          wa_settings: { ...DEFAULT_CONFIG.wa_settings, ...(data.wa_settings || {}) },
+        })
         setLoaded(true)
       })
       .catch(() => setLoaded(true))
