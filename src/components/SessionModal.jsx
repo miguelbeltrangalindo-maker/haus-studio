@@ -162,12 +162,14 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
         .replace(/{fecha}/g, fmtDate(form.fecha))
         .replace(/{hora}/g, form.hora?.slice(0, 5) || form.hora)
       set('reminder_sent', true)
+      onSave({ ...form, reminder_sent: true })
     } else {
       if (!form.link) { toast('Agrega primero el vínculo de fotos', 'error'); return }
       msg = (config.delivery_message || '')
         .replace(/{nombre}/g, form.nombre)
         .replace(/{link}/g, form.link)
       set('link_sent', true)
+      onSave({ ...form, link_sent: true })
     }
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank')
   }

@@ -43,8 +43,9 @@ function AppInner() {
     if (extra > 0) {
       const conceptos = config.extra_conceptos || []
       const concepto = conceptos.find(c =>
-        c.nombre.toLowerCase().replace(/\s+/g, ' ').includes('persona adicional') ||
-        c.nombre.toLowerCase().replace(/\s+/g, ' ').includes('persona')
+        c.nombre.toLowerCase().replace(/\s+/g, ' ').trim() === 'persona adicional'
+      ) || conceptos.find(c =>
+        c.nombre.toLowerCase().includes('persona adicional')
       )
       if (concepto) {
         const monto = extra * (+concepto.precio_unitario || 0)
