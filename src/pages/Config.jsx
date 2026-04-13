@@ -3,6 +3,39 @@ import { format, addDays } from 'date-fns'
 import { useConfig } from '../hooks/useConfig'
 import { useToast } from '../hooks/useToast'
 
+const Toggle = ({ checked, onChange }) => (
+  <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', flexShrink: 0 }}
+    onClick={() => onChange(!checked)}>
+    <div style={{
+      width: 44, height: 24, borderRadius: 12,
+      background: checked ? 'var(--green)' : 'var(--bg3)',
+      border: '1px solid var(--border)',
+      position: 'relative', transition: 'background .2s',
+    }}>
+      <div style={{
+        position: 'absolute', top: 2,
+        left: checked ? 22 : 2,
+        width: 18, height: 18, borderRadius: '50%',
+        background: checked ? '#fff' : 'var(--text3)',
+        transition: 'left .2s',
+      }} />
+    </div>
+  </label>
+)
+
+const WaToggleCard = ({ title, sub, checked, onChange, children }) => (
+  <div className="card" style={{ padding: '14px 18px', marginBottom: 12 }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+      <div>
+        <div style={{ fontWeight: 500, fontSize: 14 }}>{title}</div>
+        <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>{sub}</div>
+      </div>
+      <Toggle checked={checked} onChange={onChange} />
+    </div>
+    {children}
+  </div>
+)
+
 const DIAS_SEMANA = [
   { label: 'Dom', value: 0 },
   { label: 'Lun', value: 1 },
@@ -165,97 +198,45 @@ export default function Config() {
           <div className="config-section">
             <div className="config-title">Recordatorios de WhatsApp</div>
             <div style={{ marginBottom: 16, fontSize: 13, color: 'var(--text3)' }}>
-              Configura cuándo se envían los mensajes automáticos a tus clientes.
+              Los mensajes se envían usando la plantilla aprobada en Meta. El cron corre todos los días a las 9:00 AM.
             </div>
 
-            {/* Toggle: enviar al agendar */}
-            <div className="card" style={{ padding: '14px 18px', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-              <div>
-                <div style={{ fontWeight: 500, fontSize: 14 }}>Enviar confirmación al agendar</div>
-                <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>
-                  Manda la plantilla de WA en el momento en que creas una sesión
-                </div>
-              </div>
-              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', flexShrink: 0 }}>
-                <input
-                  type="checkbox"
-                  style={{ display: 'none' }}
-                  checked={!!form.wa_on_booking}
-                  onChange={e => set('wa_on_booking', e.target.checked)}
-                />
-                <div style={{
-                  width: 44, height: 24, borderRadius: 12,
-                  background: form.wa_on_booking ? 'var(--green)' : 'var(--bg3)',
-                  border: '1px solid var(--border)',
-                  position: 'relative', transition: 'background .2s',
-                }}>
-                  <div style={{
-                    position: 'absolute', top: 2,
-                    left: form.wa_on_booking ? 22 : 2,
-                    width: 18, height: 18, borderRadius: '50%',
-                    background: form.wa_on_booking ? '#fff' : 'var(--text3)',
-                    transition: 'left .2s',
-                  }} />
-                </div>
-              </label>
-            </div>
+            {/* Toggle 1: confirmación al agendar */}
+            {(() => {
+              const wa = form.wa_settings || {}
+              const setWa = (k, v) => set('wa_settings', { ...wa, [k]: v })
+              return (
+                <>
+                  <WaToggleCard
+                    title="Confirmación al agendar"
+                    sub="Envía la plantilla de WA en el momento en que creas una sesión"
+                    checked={!!wa.on_booking}
+                    onChange={v => setWa('on_booking', v)}
+                  />
 
-            <div className="form-group" style={{ marginBottom: 20 }}>
-              <label className="form-label">Recordatorio programado</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 8 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-                  <input type="radio" name="r1_trigger" value="on_booking"
-                    checked={form.reminder_1_trigger === 'on_booking'}
-                    onChange={() => set('reminder_1_trigger', 'on_booking')} />
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 500 }}>Al agendar la sesión</div>
-                    <div style={{ fontSize: 12, color: 'var(--text3)' }}>Se envía en el momento en que creas la sesión</div>
-                  </div>
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-                  <input type="radio" name="r1_trigger" value="days_before"
-                    checked={form.reminder_1_trigger !== 'on_booking'}
-                    onChange={() => set('reminder_1_trigger', 'days_before')} />
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 14, fontWeight: 500 }}>Días antes:</span>
-                    <select
-                      className="form-input"
-                      style={{ width: 'auto', padding: '4px 10px', fontSize: 13 }}
-                      value={form.reminder_1_days ?? 1}
-                      disabled={form.reminder_1_trigger === 'on_booking'}
-                      onChange={e => set('reminder_1_days', +e.target.value)}
-                    >
-                      <option value={1}>1 día antes</option>
-                      <option value={2}>2 días antes</option>
-                    </select>
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: 12 }}>
-                <input type="checkbox"
-                  checked={!!form.reminder_2_enabled}
-                  onChange={e => set('reminder_2_enabled', e.target.checked)} />
-                <span style={{ fontSize: 14, fontWeight: 500 }}>Activar segundo recordatorio</span>
-              </label>
-              {form.reminder_2_enabled && (
-                <div style={{ paddingLeft: 28 }}>
-                  <label className="form-label" style={{ marginBottom: 6 }}>Enviar el segundo recordatorio:</label>
-                  <select
-                    className="form-input"
-                    style={{ maxWidth: 220 }}
-                    value={form.reminder_2_days ?? 0}
-                    onChange={e => set('reminder_2_days', +e.target.value)}
+                  <WaToggleCard
+                    title="Recordatorio programado"
+                    sub="Envía un recordatorio automático a las 9:00 AM según el tiempo configurado"
+                    checked={!!wa.reminder_enabled}
+                    onChange={v => setWa('reminder_enabled', v)}
                   >
-                    <option value={0}>El mismo día de la sesión</option>
-                    <option value={1}>1 día antes</option>
-                    <option value={2}>2 días antes</option>
-                  </select>
-                </div>
-              )}
-            </div>
+                    {wa.reminder_enabled && (
+                      <select
+                        className="form-input"
+                        style={{ maxWidth: 200, marginTop: 10 }}
+                        value={wa.reminder_days ?? 1}
+                        onChange={e => setWa('reminder_days', +e.target.value)}
+                      >
+                        <option value={0}>El mismo día de la sesión</option>
+                        <option value={1}>1 día antes</option>
+                        <option value={2}>2 días antes</option>
+                        <option value={3}>3 días antes</option>
+                      </select>
+                    )}
+                  </WaToggleCard>
+                </>
+              )
+            })()}
           </div>
 
           <div className="config-section">

@@ -53,7 +53,7 @@ function AppInner() {
       }
     }
     // Send booking confirmation via WA if configured
-    if (config.wa_on_booking && result.data?.id) {
+    if (config.wa_settings?.on_booking && result.data?.id) {
       fetch('/api/send-confirmation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

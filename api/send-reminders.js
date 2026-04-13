@@ -22,14 +22,15 @@ export default async function handler(req, res) {
   // Read reminder config
   const { data: configRow } = await supabase
     .from('config')
-    .select('reminder_1_trigger, reminder_1_days, reminder_2_enabled, reminder_2_days')
+    .select('wa_settings')
     .eq('id', 1)
     .single()
 
-  const r1Trigger  = configRow?.reminder_1_trigger ?? 'days_before'
-  const r1Days     = configRow?.reminder_1_days    ?? 1
-  const r2Enabled  = configRow?.reminder_2_enabled ?? false
-  const r2Days     = configRow?.reminder_2_days    ?? 0
+  const wa         = configRow?.wa_settings || {}
+  const r1Trigger  = 'days_before'
+  const r1Days     = wa.reminder_enabled ? (wa.reminder_days ?? 1) : null
+  const r2Enabled  = false
+  const r2Days     = 0
 
   const templateName = process.env.WHATSAPP_TEMPLATE_NAME
   const phoneId      = process.env.WHATSAPP_PHONE_ID
@@ -86,8 +87,8 @@ export default async function handler(req, res) {
       weekday: 'long', day: 'numeric', month: 'long'
     })
 
-  // ── Reminder 1 (scheduled mode only — on_booking is handled at creation) ──
-  if (r1Trigger === 'days_before') {
+  // ── Reminder (scheduled — on_booking is handled at session creation) ──
+  if (r1Days !== null) {
     const targetDate = dateStrDaysFromNow(r1Days)
     const { data: sessions1 } = await supabase
       .from('sessions')
