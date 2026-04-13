@@ -71,6 +71,9 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
         toast('No puedes agendar sesiones en el pasado', 'error'); return
       }
     }
+    if (+form.anticipo > 0 && !form.metodo_anticipo) {
+      toast('Selecciona el método del anticipo', 'error'); return
+    }
     if (form.metodo_anticipo === 'cupon' && !(+form.anticipo > 0)) {
       toast('Ingresa el costo de sesión cubierto por el cupón', 'error'); return
     }
@@ -216,8 +219,11 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
               placeholder={form.metodo_anticipo === 'cupon' ? 'Costo total de la sesión' : '0'} />
           </div>
           <div className="form-group">
-            <label className="form-label">Método del anticipo</label>
-            <div className="method-tabs">
+            <label className="form-label">
+              Método del anticipo{+form.anticipo > 0 ? ' *' : ''}
+            </label>
+            <div className="method-tabs" style={+form.anticipo > 0 && !form.metodo_anticipo
+              ? { outline: '2px solid var(--red)', borderRadius: 'var(--r1)' } : {}}>
               {ANTICIPO_METHODS.map(m => (
                 <button key={m.key} type="button"
                   className={`method-tab ${form.metodo_anticipo === m.key ? 'active' : ''}`}
