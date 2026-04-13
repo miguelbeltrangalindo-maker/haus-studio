@@ -262,6 +262,7 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
           onSave={handleSave}
           onClose={() => setModal(null)}
           onDelete={handleDelete}
+          sessions={sessions}
         />
       )}
     </>

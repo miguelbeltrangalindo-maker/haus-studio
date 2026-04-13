@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { ALL_STATUSES, fmtDate, todayStr, nextStatus, nextStatusLabel } from '../lib/utils'
 import { useConfig } from '../hooks/useConfig'
 import { useToast } from '../hooks/useToast'
@@ -15,10 +15,11 @@ const ANTICIPO_METHODS = [
   { key: 'cupon',         label: 'Cupón' },
 ]
 
-export default function SessionModal({ session, prefillDate, prefillHora, onSave, onClose, onDelete }) {
+export default function SessionModal({ session, prefillDate, prefillHora, onSave, onClose, onDelete, sessions = [] }) {
   const { config } = useConfig()
   const toast = useToast()
   const isNew = !session?.id
+  const [nameFocused, setNameFocused] = useState(false)
 
   const [form, setForm] = useState({
     nombre: '',
@@ -51,6 +52,35 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
   }, [session])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  // Unique clients derived from session history
+  const clients = useMemo(() => {
+    if (!sessions.length) return []
+    const map = {}
+    sessions.forEach(s => {
+      const phone = s.telefono?.replace(/\D/g, '').slice(-10)
+      if (!phone || phone.length < 10) return
+      if (!map[phone] || s.fecha > map[phone].fecha) {
+        map[phone] = { nombre: s.nombre, telefono: s.telefono, fecha: s.fecha, count: (map[phone]?.count || 0) + 1 }
+      } else {
+        map[phone].count = (map[phone].count || 1) + 1
+      }
+    })
+    return Object.values(map).sort((a, b) => b.fecha > a.fecha ? 1 : -1)
+  }, [sessions])
+
+  const suggestions = useMemo(() => {
+    if (!isNew || !nameFocused || !form.nombre.trim()) return []
+    const q = form.nombre.toLowerCase()
+    return clients
+      .filter(c => c.nombre?.toLowerCase().includes(q) || c.telefono?.includes(form.nombre.replace(/\D/g, '')))
+      .slice(0, 7)
+  }, [clients, form.nombre, isNew, nameFocused])
+
+  const selectClient = (c) => {
+    setForm(f => ({ ...f, nombre: c.nombre, telefono: c.telefono }))
+    setNameFocused(false)
+  }
 
   const handleSave = async () => {
     if (!form.nombre.trim()) { toast('El nombre es requerido', 'error'); return }
@@ -167,10 +197,31 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
         {/* Contacto */}
         <div className="modal-section-title">Contacto</div>
         <div className="form-grid">
-          <div className="form-group">
+          <div className="form-group" style={{ position: 'relative' }}>
             <label className="form-label">Nombre completo *</label>
-            <input className="form-input" value={form.nombre}
-              onChange={e => set('nombre', e.target.value)} placeholder="Nombre del cliente" />
+            <input
+              className="form-input"
+              value={form.nombre}
+              onChange={e => set('nombre', e.target.value)}
+              placeholder="Nombre del cliente"
+              onFocus={() => setNameFocused(true)}
+              onBlur={() => setTimeout(() => setNameFocused(false), 150)}
+              autoComplete="off"
+            />
+            {suggestions.length > 0 && (
+              <div className="client-suggestions">
+                {suggestions.map((c, i) => (
+                  <div key={i} className="client-suggestion" onMouseDown={() => selectClient(c)}>
+                    <div className="client-suggestion-name">{c.nombre}</div>
+                    <div className="client-suggestion-meta">
+                      {c.telefono}
+                      {' · '}{c.count} sesión{c.count !== 1 ? 'es' : ''}
+                      {c.fecha && ` · últ. ${fmtDate(c.fecha)}`}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <div className="form-group">
             <label className="form-label">

@@ -223,6 +223,7 @@ export default function Hoy({ sessions, loading, createSession, updateSession })
           onSave={handleSave}
           onClose={() => setModal(null)}
           onDelete={handleDelete}
+          sessions={sessions}
         />
       )}
     </>

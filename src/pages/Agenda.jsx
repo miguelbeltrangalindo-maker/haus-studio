@@ -361,6 +361,7 @@ export default function Agenda({ sessions, createSession, updateSession, onSelec
           onSave={handleSave}
           onClose={() => setModal(null)}
           onDelete={handleDelete}
+          sessions={sessions}
         />
       )}
     </>
