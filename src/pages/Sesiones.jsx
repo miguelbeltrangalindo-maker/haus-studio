@@ -5,6 +5,7 @@ import { useToast } from '../hooks/useToast'
 import Badge from '../components/Badge'
 import SessionModal from '../components/SessionModal'
 import { useConfig } from '../hooks/useConfig'
+import { exportSesiones } from '../lib/exportExcel'
 
 const QUICK = [
   { label: 'Todas',            key: '' },
@@ -130,6 +131,10 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
         <div className="topbar-right">
           <button className="btn btn-ghost btn-sm" onClick={exportCSV} title="Exportar CSV">
             ↓ CSV
+          </button>
+          <button className="btn btn-ghost btn-sm" onClick={() => exportSesiones(filtered)} title="Exportar Excel"
+            disabled={filtered.length === 0}>
+            ↓ Excel
           </button>
           <button className="btn btn-primary btn-sm" onClick={() => setModal({})}>+ Nueva sesión</button>
         </div>

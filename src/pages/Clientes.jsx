@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { fmtDate, initials } from '../lib/utils'
 import Badge from '../components/Badge'
+import { exportClientes } from '../lib/exportExcel'
 
 export default function Clientes({ sessions = [], loading, onSelectSession }) {
   const [search, setSearch]     = useState('')
@@ -66,6 +67,14 @@ export default function Clientes({ sessions = [], loading, onSelectSession }) {
           <span style={{ fontSize: 12, color: 'var(--text3)' }}>
             {!loading && `${filtered.length} cliente${filtered.length !== 1 ? 's' : ''}`}
           </span>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => exportClientes(sessions)}
+            title="Exportar clientes a Excel"
+            disabled={sessions.length === 0}
+          >
+            ↓ Excel
+          </button>
         </div>
       </div>
 
