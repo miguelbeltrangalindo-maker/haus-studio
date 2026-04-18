@@ -46,7 +46,7 @@ const DIAS_SEMANA = [
   { label: 'Sáb', value: 6 },
 ]
 
-export default function Config() {
+export default function Config({ comisionSchemaReady = false }) {
   const { config, updateConfig } = useConfig()
   const toast = useToast()
   const [form, setForm] = useState(config)
@@ -403,6 +403,89 @@ export default function Config() {
                 </div>
               )}
             </div>
+          </div>
+
+          {/* ── Finanzas ── */}
+          <div className="config-section">
+            <div className="config-title">Finanzas — Comisión bancaria</div>
+            <div style={{ marginBottom: 16, fontSize: 13, color: 'var(--text3)', lineHeight: 1.6 }}>
+              Define el porcentaje que cobra el banco por pagos con tarjeta.
+              Cuando se registre un pago con método <strong>Tarjeta</strong> (anticipo o cobro de saldo),
+              el sistema creará automáticamente un gasto de comisión en la categoría
+              <em> Comisión bancaria</em>. Si ese pago se edita o elimina, el gasto se actualizará o eliminará también.
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+              <div className="form-group" style={{ maxWidth: 180 }}>
+                <label className="form-label">% de comisión por tarjeta</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <input
+                    className="form-input"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={form.payment_settings?.comision_tarjeta ?? 0}
+                    onChange={e => set('payment_settings', {
+                      ...(form.payment_settings || {}),
+                      comision_tarjeta: +e.target.value,
+                    })}
+                    style={{ textAlign: 'right' }}
+                  />
+                  <span style={{ fontSize: 14, color: 'var(--text2)', fontWeight: 600 }}>%</span>
+                </div>
+              </div>
+
+              {/* Preview */}
+              {(form.payment_settings?.comision_tarjeta ?? 0) > 0 && (
+                <div style={{
+                  background: 'var(--amber-bg)', border: '1px solid rgba(158,107,26,.25)',
+                  borderRadius: 'var(--r2)', padding: '10px 16px', fontSize: 13,
+                  color: 'var(--text2)', lineHeight: 1.5,
+                }}>
+                  Ejemplo: un pago con tarjeta de{' '}
+                  <strong>$1,000</strong> generará automáticamente un gasto de{' '}
+                  <strong style={{ color: 'var(--amber)' }}>
+                    ${(1000 * ((form.payment_settings?.comision_tarjeta ?? 0) / 100)).toFixed(2)}
+                  </strong>
+                </div>
+              )}
+            </div>
+
+            {/* Aviso de migración SQL si las columnas no existen */}
+            {!comisionSchemaReady && (
+              <div style={{
+                background: 'var(--red-bg)', border: '1px solid rgba(156,53,53,.25)',
+                borderRadius: 'var(--r2)', padding: '14px 18px',
+              }}>
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8, color: 'var(--red-l)' }}>
+                  Requiere migración en Supabase
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 10, lineHeight: 1.6 }}>
+                  Para habilitar la comisión automática ejecuta este SQL en el editor de Supabase:
+                </div>
+                <pre className="sql-block">{`-- Habilita el módulo de comisión bancaria automática
+ALTER TABLE gastos ADD COLUMN IF NOT EXISTS auto_comision boolean DEFAULT false;
+ALTER TABLE gastos ADD COLUMN IF NOT EXISTS source_ref text;
+ALTER TABLE gastos ADD COLUMN IF NOT EXISTS categoria text DEFAULT 'Otros';`}</pre>
+                <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 8 }}>
+                  Una vez ejecutado, recarga la página y el módulo quedará activo.
+                </div>
+              </div>
+            )}
+
+            {comisionSchemaReady && (
+              <div style={{
+                background: 'var(--green-bg)', border: '1px solid rgba(45,138,58,.25)',
+                borderRadius: 'var(--r2)', padding: '10px 16px', fontSize: 13, color: 'var(--text2)',
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}>
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--green)" strokeWidth="2">
+                  <polyline points="3 8 6.5 11.5 13 4.5"/>
+                </svg>
+                Módulo activo — las comisiones se registrarán automáticamente
+              </div>
+            )}
           </div>
 
           <div style={{ paddingTop: 8 }}>

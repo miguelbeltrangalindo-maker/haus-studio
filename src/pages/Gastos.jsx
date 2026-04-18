@@ -5,15 +5,16 @@ import { todayStr } from '../lib/utils'
 import { useToast } from '../hooks/useToast'
 import { exportGastos } from '../lib/exportExcel'
 
-const CATEGORIAS = ['Equipo', 'Renta', 'Servicios', 'Marketing', 'Sueldos', 'Otros']
+const CATEGORIAS = ['Equipo', 'Renta', 'Servicios', 'Marketing', 'Sueldos', 'Comisión bancaria', 'Otros']
 
 const CAT_COLORS = {
-  Equipo:    'var(--violet)',
-  Renta:     'var(--amber)',
-  Servicios: '#1A7A9E',
-  Marketing: '#9E6B1A',
-  Sueldos:   'var(--green)',
-  Otros:     'var(--text3)',
+  Equipo:               'var(--violet)',
+  Renta:                'var(--amber)',
+  Servicios:            '#1A7A9E',
+  Marketing:            '#9E6B1A',
+  Sueldos:              'var(--green)',
+  'Comisión bancaria':  'var(--red)',
+  Otros:                'var(--text3)',
 }
 
 const QUICK_RANGES = [
