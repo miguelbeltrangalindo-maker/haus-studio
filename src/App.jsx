@@ -28,7 +28,7 @@ function AppInner() {
     createGasto, updateGasto, deleteGasto,
     createComisionGasto, updateComisionByRef, deleteComisionByRef,
   } = useGastos()
-  const { pagos, createPago, deletePago } = usePagos()
+  const { pagos, createPago, updatePago, deletePago } = usePagos()
   const { extras, createExtra, updateExtra, deleteExtra, tableError: extrasTableError } = useExtras()
   const { config } = useConfig()
   const toast = useToast()
@@ -182,12 +182,62 @@ function AppInner() {
     return result
   }
 
-  // deletePago wrapper: elimina comisión asociada
+  // updatePago wrapper: recalcula sesión y sincroniza comisión
+  const updatePagoWithComision = async (pagoId, updates, oldPago) => {
+    const { error } = await updatePago(pagoId, updates)
+    if (error) return { error }
+
+    const newMonto  = +updates.monto  ?? +oldPago.monto
+    const newMetodo = updates.metodo  ?? oldPago.metodo
+    const oldMonto  = +oldPago.monto  || 0
+    const oldMetodo = oldPago.metodo
+
+    // Recalcular campos de la sesión
+    const sess = sessions.find(s => s.id === oldPago.session_id)
+    if (sess) {
+      const delta = newMonto - oldMonto
+      await updateSession(oldPago.session_id, {
+        pagos:       String(Math.max(0, (+sess.pagos    || 0) + delta)),
+        restante:    String(Math.max(0, (+sess.restante || 0) - delta)),
+        metodo_pago: newMetodo,
+      })
+    }
+
+    // Sincronizar comisión
+    if (comisionPct > 0 && comisionSchemaReady) {
+      const ref = `pago:${pagoId}`
+      if (oldMetodo === 'tarjeta' && newMetodo === 'tarjeta') {
+        await updateComisionByRef(ref, comisionMonto(newMonto))
+      } else if (oldMetodo === 'tarjeta' && newMetodo !== 'tarjeta') {
+        await deleteComisionByRef(ref)
+      } else if (oldMetodo !== 'tarjeta' && newMetodo === 'tarjeta') {
+        const s = sessions.find(s => s.id === oldPago.session_id)
+        await createComisionGasto(ref, comisionMonto(newMonto), comisionConcepto(s?.nombre), todayFecha())
+      }
+    }
+
+    return {}
+  }
+
+  // deletePago wrapper: recalcula sesión y elimina comisión
   const deletePagoWithComision = async (pagoId) => {
+    const pago = pagos.find(p => p.id === pagoId)
     const result = await deletePago(pagoId)
     if (result?.error) return result
-    await deleteComisionByRef(`pago:${pagoId}`)
-    return result
+
+    if (pago) {
+      // Devolver el monto a restante y descontar de pagos
+      const sess = sessions.find(s => s.id === pago.session_id)
+      if (sess) {
+        await updateSession(pago.session_id, {
+          pagos:    String(Math.max(0, (+sess.pagos    || 0) - (+pago.monto || 0))),
+          restante: String(          (+sess.restante || 0) + (+pago.monto || 0)),
+        })
+      }
+      await deleteComisionByRef(`pago:${pagoId}`)
+    }
+
+    return {}
   }
 
   const shared = {
@@ -230,6 +280,7 @@ function AppInner() {
           deleteSession={deleteSessionWithComision}
           sessionPagos={pagos.filter(p => p.session_id === currentSelected?.id)}
           createPago={createPagoWithComision}
+          updatePago={updatePagoWithComision}
           deletePago={deletePagoWithComision}
           sessionExtras={extras.filter(e => e.session_id === currentSelected?.id)}
           createExtra={createExtra}

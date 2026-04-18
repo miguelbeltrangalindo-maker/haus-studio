@@ -464,12 +464,14 @@ export default function Config({ comisionSchemaReady = false }) {
                 <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 10, lineHeight: 1.6 }}>
                   Para habilitar la comisión automática ejecuta este SQL en el editor de Supabase:
                 </div>
-                <pre className="sql-block">{`-- Habilita el módulo de comisión bancaria automática
+                <pre className="sql-block">{`-- 1. Columnas en la tabla gastos
 ALTER TABLE gastos ADD COLUMN IF NOT EXISTS auto_comision boolean DEFAULT false;
 ALTER TABLE gastos ADD COLUMN IF NOT EXISTS source_ref text;
-ALTER TABLE gastos ADD COLUMN IF NOT EXISTS categoria text DEFAULT 'Otros';`}</pre>
+
+-- 2. Columna en la tabla config
+ALTER TABLE config ADD COLUMN IF NOT EXISTS payment_settings jsonb DEFAULT '{"comision_tarjeta":0}'::jsonb;`}</pre>
                 <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 8 }}>
-                  Una vez ejecutado, recarga la página y el módulo quedará activo.
+                  Ejecuta ambos bloques y recarga la página — el módulo quedará activo.
                 </div>
               </div>
             )}

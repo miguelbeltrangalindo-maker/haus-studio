@@ -34,6 +34,19 @@ export function usePagos() {
     return { data }
   }
 
+  const updatePago = async (id, updates) => {
+    if (tableError) return { error: 'Tabla no disponible' }
+    const { data, error } = await supabase
+      .from('session_pagos')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) return { error: error.message }
+    setPagos(prev => prev.map(p => p.id === id ? data : p))
+    return { data }
+  }
+
   const deletePago = async (id) => {
     if (tableError) return { error: 'Tabla no disponible' }
     const { error } = await supabase.from('session_pagos').delete().eq('id', id)
@@ -42,5 +55,5 @@ export function usePagos() {
     return {}
   }
 
-  return { pagos, loading, tableError, createPago, deletePago, fetch }
+  return { pagos, loading, tableError, createPago, updatePago, deletePago, fetch }
 }

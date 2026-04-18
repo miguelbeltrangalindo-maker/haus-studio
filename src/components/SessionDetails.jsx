@@ -13,7 +13,7 @@ const METHODS = [
 
 const METHOD_LABEL = { efectivo: 'Efectivo', transferencia: 'Transferencia', tarjeta: 'Tarjeta' }
 
-export default function SessionDetails({ session, onClose, updateSession, deleteSession, sessionPagos = [], createPago, sessionExtras = [], createExtra, updateExtra, deleteExtra, sessions = [] }) {
+export default function SessionDetails({ session, onClose, updateSession, deleteSession, sessionPagos = [], createPago, updatePago, deletePago, sessionExtras = [], createExtra, updateExtra, deleteExtra, sessions = [] }) {
   const { config } = useConfig()
   const toast = useToast()
   const [editOpen, setEditOpen]   = useState(false)
@@ -26,6 +26,11 @@ export default function SessionDetails({ session, onClose, updateSession, delete
   const [applyingExtras, setApplyingExtras] = useState(false)
   const [descuento, setDescuento]           = useState('')
   const [applyingDesc, setApplyingDesc]     = useState(false)
+  // ── Edición de pagos ──
+  const [editingPagoId,  setEditingPagoId]  = useState(null)
+  const [editPagoMonto,  setEditPagoMonto]  = useState('')
+  const [editPagoMetodo, setEditPagoMetodo] = useState('efectivo')
+  const [savingPago,     setSavingPago]     = useState(false)
 
   if (!session) return null
 
@@ -144,6 +149,30 @@ export default function SessionDetails({ session, onClose, updateSession, delete
       updateSession(session.id, { link_sent: true })
     }
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank')
+  }
+
+  const startEditPago = (p) => {
+    setEditingPagoId(p.id)
+    setEditPagoMonto(String(p.monto))
+    setEditPagoMetodo(p.metodo || 'efectivo')
+  }
+
+  const handleSavePago = async (oldPago) => {
+    const monto = +editPagoMonto
+    if (!monto || monto <= 0) { toast('Monto inválido', 'error'); return }
+    setSavingPago(true)
+    const { error } = await updatePago(oldPago.id, { monto, metodo: editPagoMetodo }, oldPago)
+    setSavingPago(false)
+    if (error) { toast(error, 'error'); return }
+    toast('Pago actualizado', 'success')
+    setEditingPagoId(null)
+  }
+
+  const handleDeletePago = async (p) => {
+    if (!confirm(`¿Eliminar este pago de $${(+p.monto).toLocaleString()} (${METHOD_LABEL[p.metodo] || p.metodo})?\n\nEl saldo pendiente de la sesión se ajustará automáticamente.`)) return
+    const { error } = await deletePago(p.id)
+    if (error) { toast(error, 'error'); return }
+    toast('Pago eliminado — saldo actualizado')
   }
 
   const handleSave = async (form) => {
@@ -395,15 +424,93 @@ export default function SessionDetails({ session, onClose, updateSession, delete
         {/* Payment history */}
         {sessionPagos.length > 0 && (
           <div className="dp-section">
-            <div className="dp-section-label">Historial de pagos</div>
+            <div className="dp-section-label">Historial de cobros</div>
             {sessionPagos.map(p => (
-              <div key={p.id} className="dp-meta-row">
-                <span className="dp-meta-label" style={{ textTransform: 'capitalize' }}>
-                  {METHOD_LABEL[p.metodo] || p.metodo}
-                </span>
-                <span className="dp-meta-value" style={{ color: 'var(--green-l)', fontWeight: 600 }}>
-                  ${(+p.monto).toLocaleString()}
-                </span>
+              <div key={p.id} style={{ marginBottom: 6 }}>
+                {editingPagoId === p.id ? (
+                  /* ── Inline edit form ── */
+                  <div style={{
+                    background: 'var(--bg3)', border: '1px solid var(--border)',
+                    borderRadius: 'var(--r2)', padding: '12px 14px',
+                  }}>
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                      <div style={{ flex: 1 }}>
+                        <div className="form-label" style={{ marginBottom: 4 }}>Monto</div>
+                        <input
+                          className="form-input"
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          value={editPagoMonto}
+                          onChange={e => setEditPagoMonto(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="method-tabs" style={{ marginBottom: 10 }}>
+                      {METHODS.map(m => (
+                        <button
+                          key={m.key}
+                          type="button"
+                          className={`method-tab${editPagoMetodo === m.key ? ' active' : ''}`}
+                          onClick={() => setEditPagoMetodo(m.key)}
+                        >
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        className="btn btn-primary btn-xs"
+                        onClick={() => handleSavePago(p)}
+                        disabled={savingPago}
+                        style={{ flex: 1 }}
+                      >
+                        {savingPago ? '…' : 'Guardar'}
+                      </button>
+                      <button
+                        className="btn btn-ghost btn-xs"
+                        onClick={() => setEditingPagoId(null)}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* ── Display row ── */
+                  <div className="dp-meta-row">
+                    <span className="dp-meta-label" style={{ textTransform: 'capitalize' }}>
+                      {METHOD_LABEL[p.metodo] || p.metodo}
+                      {p.nota ? <span style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 4 }}>· {p.nota}</span> : null}
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span className="dp-meta-value" style={{ color: 'var(--green-l)', fontWeight: 600 }}>
+                        ${(+p.monto).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                      </span>
+                      {updatePago && (
+                        <button
+                          onClick={() => startEditPago(p)}
+                          title="Editar pago"
+                          style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: '2px 4px', lineHeight: 1 }}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <path d="M11.5 2.5l2 2-9 9H2.5v-2l9-9z"/>
+                          </svg>
+                        </button>
+                      )}
+                      {deletePago && (
+                        <button
+                          onClick={() => handleDeletePago(p)}
+                          title="Eliminar pago"
+                          style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', padding: '2px 4px', lineHeight: 1 }}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <path d="M3 5h10M6 5V3.5a.5.5 0 01.5-.5h3a.5.5 0 01.5.5V5M5 5l.5 8h5L11 5"/>
+                          </svg>
+                        </button>
+                      )}
+                    </span>
+                  </div>
+                )}
               </div>
             ))}
           </div>
