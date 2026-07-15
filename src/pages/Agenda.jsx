@@ -247,7 +247,7 @@ export default function Agenda({ sessions, createSession, updateSession, createP
             const ds = format(d, 'yyyy-MM-dd')
             const isToday = ds === todayS
             return (
-              <div key={i} className="day-header" style={{ background: isToday ? 'rgba(200,184,154,.06)' : undefined }}>
+              <div key={i} className="day-header" style={{ background: isToday ? 'rgba(139,92,246,.09)' : undefined }}>
                 <div className="day-name">{weekDays[i]}</div>
                 <div className={`day-num ${isToday ? 'today' : ''}`}>{d.getDate()}</div>
               </div>

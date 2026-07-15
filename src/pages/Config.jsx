@@ -220,7 +220,7 @@ export default function Config({ comisionSchemaReady = false }) {
             {!statsSchemaReady && (
               <div style={{
                 marginTop: 16,
-                background: 'var(--red-bg)', border: '1px solid rgba(156,53,53,.25)',
+                background: 'var(--red-bg)', border: '1px solid rgba(248,113,113,.3)',
                 borderRadius: 'var(--r2)', padding: '14px 18px',
               }}>
                 <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6, color: 'var(--red-l)' }}>
@@ -503,7 +503,7 @@ export default function Config({ comisionSchemaReady = false }) {
               {/* Preview */}
               {(form.payment_settings?.comision_tarjeta ?? 0) > 0 && (
                 <div style={{
-                  background: 'var(--amber-bg)', border: '1px solid rgba(158,107,26,.25)',
+                  background: 'var(--amber-bg)', border: '1px solid rgba(251,191,36,.3)',
                   borderRadius: 'var(--r2)', padding: '10px 16px', fontSize: 13,
                   color: 'var(--text2)', lineHeight: 1.5,
                 }}>
@@ -519,7 +519,7 @@ export default function Config({ comisionSchemaReady = false }) {
             {/* Aviso de migración SQL si las columnas no existen */}
             {!comisionSchemaReady && (
               <div style={{
-                background: 'var(--red-bg)', border: '1px solid rgba(156,53,53,.25)',
+                background: 'var(--red-bg)', border: '1px solid rgba(248,113,113,.3)',
                 borderRadius: 'var(--r2)', padding: '14px 18px',
               }}>
                 <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8, color: 'var(--red-l)' }}>
@@ -542,7 +542,7 @@ ALTER TABLE config ADD COLUMN IF NOT EXISTS payment_settings jsonb DEFAULT '{"co
 
             {comisionSchemaReady && (
               <div style={{
-                background: 'var(--green-bg)', border: '1px solid rgba(45,138,58,.25)',
+                background: 'var(--green-bg)', border: '1px solid rgba(52,211,153,.3)',
                 borderRadius: 'var(--r2)', padding: '10px 16px', fontSize: 13, color: 'var(--text2)',
                 display: 'flex', alignItems: 'center', gap: 8,
               }}>

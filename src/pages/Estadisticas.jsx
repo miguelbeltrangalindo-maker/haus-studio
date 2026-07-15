@@ -174,8 +174,8 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
 
   // Pie: payment methods
   const COLORS = {
-    efectivo: '#2D8A3A', transferencia: '#6B4FA8', tarjeta: '#9E6B1A', cupon: '#1A7A9E',
-    green: '#2D8A3A', violet: '#6B4FA8', amber: '#9E6B1A', red: '#9C3535',
+    efectivo: '#34D399', transferencia: '#A78BFA', tarjeta: '#FBBF24', cupon: '#22D3EE',
+    green: '#34D399', violet: '#8B5CF6', amber: '#FBBF24', red: '#F87171',
   }
   const pieMetodos = METODOS
     .map(m => ({ name: m.label, value: metodosMap[m.key] || 0, color: COLORS[m.key] }))
@@ -183,11 +183,11 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
 
   // Pie: session status
   const PIE_STATUS = [
-    { name: 'Confirmadas',      value: rangeActive.filter(s => ['Reservada','Confirmada','Llegó','En sesión'].includes(s.estatus)).length, color: '#6B4FA8' },
-    { name: 'Completadas',      value: rangeActive.filter(s => s.estatus === 'Completada').length, color: '#2D8A3A' },
-    { name: 'Pend. entrega',    value: rangeActive.filter(s => s.estatus === 'Pendiente de entrega').length, color: '#9E6B1A' },
-    { name: 'Entregadas',       value: rangeActive.filter(s => s.estatus === 'Entregada').length, color: '#3BA44A' },
-    { name: 'Canceladas',       value: canceladas.length, color: '#9C3535' },
+    { name: 'Confirmadas',      value: rangeActive.filter(s => ['Reservada','Confirmada','Llegó','En sesión'].includes(s.estatus)).length, color: '#8B5CF6' },
+    { name: 'Completadas',      value: rangeActive.filter(s => s.estatus === 'Completada').length, color: '#34D399' },
+    { name: 'Pend. entrega',    value: rangeActive.filter(s => s.estatus === 'Pendiente de entrega').length, color: '#FBBF24' },
+    { name: 'Entregadas',       value: rangeActive.filter(s => s.estatus === 'Entregada').length, color: '#6EE7B7' },
+    { name: 'Canceladas',       value: canceladas.length, color: '#F87171' },
   ].filter(d => d.value > 0)
 
   // ── Status breakdown ──
@@ -291,8 +291,8 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
                     formatter={(v, name) => [name === 'Ingresos' ? `$${v.toLocaleString()}` : v, name]}
                   />
                   <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
-                  <Bar yAxisId="ses" dataKey="Sesiones" fill="#6B4FA8" radius={[4, 4, 0, 0]} maxBarSize={32} />
-                  <Bar yAxisId="ing" dataKey="Ingresos" fill="#2D8A3A" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                  <Bar yAxisId="ses" dataKey="Sesiones" fill="#8B5CF6" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                  <Bar yAxisId="ing" dataKey="Ingresos" fill="#34D399" radius={[4, 4, 0, 0]} maxBarSize={32} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -316,11 +316,11 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
                     formatter={(v, name) => [`$${v.toLocaleString()}`, name]}
                   />
                   <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
-                  <Line type="monotone" dataKey="Día" stroke="#6B4FA8" strokeWidth={2}
-                    dot={{ r: 4, fill: '#6B4FA8', strokeWidth: 0 }}
+                  <Line type="monotone" dataKey="Día" stroke="#A78BFA" strokeWidth={2}
+                    dot={{ r: 4, fill: '#A78BFA', strokeWidth: 0 }}
                     activeDot={{ r: 6 }} connectNulls />
-                  <Line type="monotone" dataKey="Acumulado" stroke="#2D8A3A" strokeWidth={2}
-                    dot={{ r: 3, fill: '#2D8A3A', strokeWidth: 0 }}
+                  <Line type="monotone" dataKey="Acumulado" stroke="#34D399" strokeWidth={2}
+                    dot={{ r: 3, fill: '#34D399', strokeWidth: 0 }}
                     activeDot={{ r: 6 }} connectNulls strokeDasharray="5 3" />
                 </LineChart>
               </ResponsiveContainer>
@@ -373,7 +373,7 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
                     <div className="breakdown-label">{s.nombre}</div>
                     <div className="breakdown-right">
                       <span className="breakdown-date">{s.fecha}</span>
-                      <span className="breakdown-amount" style={{ color: 'var(--text-violet, #6B4FA8)' }}>${(+s.anticipo).toLocaleString()}</span>
+                      <span className="breakdown-amount" style={{ color: 'var(--violet-l)' }}>${(+s.anticipo).toLocaleString()}</span>
                     </div>
                   </div>
                 ))}

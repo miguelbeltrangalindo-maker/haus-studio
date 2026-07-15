@@ -156,9 +156,10 @@ export default function DashboardMobile({
             className="menu-card"
             onClick={() => setModal(true)}
             style={{
-              background: 'var(--green)',
+              background: 'var(--grad)',
               border: 'none',
               color: '#fff',
+              boxShadow: '0 4px 20px rgba(139,92,246,.35), inset 0 1px 0 rgba(255,255,255,.2)',
             }}
           >
             <div style={{

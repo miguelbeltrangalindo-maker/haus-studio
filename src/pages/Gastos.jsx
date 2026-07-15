@@ -9,13 +9,13 @@ import { SkeletonRows, EmptyState } from '../components/Skeleton'
 const CATEGORIAS = ['Equipo', 'Renta', 'Servicios', 'Marketing', 'Sueldos', 'Comisión bancaria', 'Otros']
 
 const CAT_COLORS = {
-  Equipo:               'var(--violet)',
-  Renta:                'var(--amber)',
-  Servicios:            '#1A7A9E',
-  Marketing:            '#9E6B1A',
-  Sueldos:              'var(--green)',
-  'Comisión bancaria':  'var(--red)',
-  Otros:                'var(--text3)',
+  Equipo:               '#A78BFA',
+  Renta:                '#FCD34D',
+  Servicios:            '#22D3EE',
+  Marketing:            '#FB923C',
+  Sueldos:              '#6EE7B7',
+  'Comisión bancaria':  '#FCA5A5',
+  Otros:                '#8E89A8',
 }
 
 const QUICK_RANGES = [

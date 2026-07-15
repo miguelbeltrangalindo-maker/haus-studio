@@ -306,6 +306,7 @@ function AppInner() {
             <button className="btn btn-sm" onClick={fetch}>Reintentar</button>
           </div>
         )}
+        <div className="route-in" key={location.pathname}>
         <Routes>
           <Route path="/"             element={<Dashboard    {...shared} />} />
           <Route path="/hoy"          element={<Hoy          {...shared} pagos={pagos} gastos={gastos} />} />
@@ -326,6 +327,7 @@ function AppInner() {
           } />
           <Route path="/config"       element={<Config comisionSchemaReady={comisionSchemaReady} />} />
         </Routes>
+        </div>
       </main>
       {searchOpen && (
         <GlobalSearch
