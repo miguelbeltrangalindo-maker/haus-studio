@@ -119,7 +119,12 @@ function AppInner() {
       ) || conceptos.find(c => c.nombre.toLowerCase().includes('persona adicional'))
       if (concepto) {
         const monto = extra * (+concepto.precio_unitario || 0)
-        await createExtra(session.id, concepto.nombre, monto, extra, +concepto.precio_unitario || 0)
+        const er = await createExtra(session.id, concepto.nombre, monto, extra, +concepto.precio_unitario || 0)
+        // El cargo automático también debe sumarse al saldo por cobrar,
+        // igual que los extras agregados manualmente en SessionDetails
+        if (!er?.error && monto > 0) {
+          await updateSession(session.id, { restante: String((+session.restante || 0) + monto) })
+        }
       }
     }
 
