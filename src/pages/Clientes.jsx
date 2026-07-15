@@ -36,7 +36,8 @@ export default function Clientes({ sessions = [], loading, onSelectSession }) {
         telefono: latest?.telefono || c.telefono,
         ultimaVisita: latest?.fecha || '',
         totalSesiones: activas.length,
-        totalCanceladas: c.sesiones.length - activas.length,
+        totalCanceladas: c.sesiones.filter(s => s.estatus === 'Cancelada').length,
+        totalNoShow: c.sesiones.filter(s => s.estatus === 'No show').length,
         totalGastado,
         saldoPendiente,
         sesiones: sorted,
@@ -171,6 +172,11 @@ export default function Clientes({ sessions = [], loading, onSelectSession }) {
                         {c.totalCanceladas > 0 && (
                           <span style={{ color: 'var(--text3)' }}>
                             {c.totalCanceladas} cancelada{c.totalCanceladas !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                        {c.totalNoShow > 0 && (
+                          <span style={{ color: 'var(--red)' }}>
+                            {c.totalNoShow} no-show{c.totalNoShow !== 1 ? 's' : ''}
                           </span>
                         )}
                       </div>

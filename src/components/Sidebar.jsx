@@ -52,9 +52,16 @@ const IconPeople = () => (
   </svg>
 )
 
+const IconSearch = () => (
+  <svg className="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <circle cx="7" cy="7" r="4.5"/>
+    <path d="M10.5 10.5L14 14"/>
+  </svg>
+)
+
 const navLink = ({ isActive }) => `nav-item ${isActive ? 'active' : ''}`
 
-export default function Sidebar() {
+export default function Sidebar({ onSearch }) {
   return (
     <aside className="sidebar">
       <div className="logo">
@@ -63,6 +70,10 @@ export default function Sidebar() {
       </div>
 
       <nav className="nav">
+        <button type="button" className="nav-item nav-search" onClick={onSearch}>
+          <IconSearch /><span>Buscar</span>
+          <kbd className="nav-search-kbd">⌘K</kbd>
+        </button>
         <NavLink to="/" end className={navLink}>
           <IconGrid /><span>Dashboard</span>
         </NavLink>

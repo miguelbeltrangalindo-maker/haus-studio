@@ -328,6 +328,34 @@ export default function Config({ comisionSchemaReady = false }) {
           </div>
 
           <div className="config-section">
+            <div className="config-title">Mensaje de cobranza de saldo — WhatsApp</div>
+            <div style={{ marginBottom: 12, fontSize: 13, color: 'var(--text3)' }}>
+              Se usa al recordar saldos pendientes desde Sesiones y Estadísticas. Variables:{' '}
+              <code style={{ background: 'var(--bg3)', padding: '2px 6px', borderRadius: 4 }}>{'{nombre}'}</code>{' '}
+              <code style={{ background: 'var(--bg3)', padding: '2px 6px', borderRadius: 4 }}>{'{saldo}'}</code>{' '}
+              <code style={{ background: 'var(--bg3)', padding: '2px 6px', borderRadius: 4 }}>{'{fecha}'}</code>
+            </div>
+            <div className="form-group">
+              <textarea className="form-input" rows="5"
+                value={form.wa_settings?.cobranza_message || ''}
+                onChange={e => set('wa_settings', { ...(form.wa_settings || {}), cobranza_message: e.target.value })} />
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 8 }}>Vista previa</div>
+              <div style={{
+                background: 'var(--bg3)', border: '1px solid var(--border)',
+                borderRadius: 'var(--r2)', padding: '12px 16px',
+                fontSize: 13, color: 'var(--text2)', lineHeight: 1.7, whiteSpace: 'pre-wrap',
+              }}>
+                {(form.wa_settings?.cobranza_message || '')
+                  .replace(/{nombre}/g, 'Ana García')
+                  .replace(/{saldo}/g, '$500')
+                  .replace(/{fecha}/g, '15/06/2025')}
+              </div>
+            </div>
+          </div>
+
+          <div className="config-section">
             <div className="config-title">Cargos adicionales</div>
             <div style={{ marginBottom: 14, fontSize: 13, color: 'var(--text3)' }}>
               Define los cargos que pueden añadirse a cada sesión. Cada uno tiene un precio por unidad y se puede aplicar hasta ×9 veces.

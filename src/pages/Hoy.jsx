@@ -26,13 +26,15 @@ import { useConfirm } from '../components/ConfirmDialog'
 import Badge from '../components/Badge'
 import SessionModal from '../components/SessionModal'
 import QuickCobrarSheet from '../components/QuickCobrarSheet'
+import CorteSheet from '../components/CorteSheet'
 
-export default function Hoy({ sessions, loading, createSession, updateSession, createPago }) {
+export default function Hoy({ sessions, loading, createSession, updateSession, createPago, deletePago, pagos = [], gastos = [] }) {
   const { config } = useConfig()
   const toast = useToast()
   const confirm = useConfirm()
   const [modal, setModal] = useState(null)
   const [cobrarSession, setCobrarSession] = useState(null)
+  const [corteOpen, setCorteOpen] = useState(false)
   const [sendingWA, setSendingWA] = useState(new Set())
 
   const sendTemplate = async (s, e) => {
@@ -69,9 +71,12 @@ export default function Hoy({ sessions, loading, createSession, updateSession, c
   const dateLabel = format(new Date(), "EEEE, d 'de' MMMM yyyy", { locale: es })
 
   const handleQuick = async (session, newStatus) => {
+    const prevStatus = session.estatus
     const result = await updateSession(session.id, { estatus: newStatus })
     if (result.error) { toast(result.error, 'error'); return }
-    toast(`${session.nombre.split(' ')[0]} → ${newStatus}`, 'success')
+    toast(`${session.nombre.split(' ')[0]} → ${newStatus}`, 'success', {
+      action: { label: 'Deshacer', onClick: () => updateSession(session.id, { estatus: prevStatus }) },
+    })
   }
 
   const openWA = (s, type, e) => {
@@ -125,6 +130,9 @@ export default function Hoy({ sessions, loading, createSession, updateSession, c
         <div className="topbar-title">Hoy</div>
         <div className="topbar-right">
           <span className="topbar-date">{dateLabel}</span>
+          <button className="btn btn-ghost btn-sm" onClick={() => setCorteOpen(true)} title="Corte del día: entradas por método, gastos y neto">
+            Corte
+          </button>
           <button className="btn btn-primary btn-sm" onClick={() => setModal({ prefillDate: today })}>
             + Nueva sesión
           </button>
@@ -308,6 +316,16 @@ export default function Hoy({ sessions, loading, createSession, updateSession, c
           onClose={() => setCobrarSession(null)}
           updateSession={updateSession}
           createPago={createPago}
+          deletePago={deletePago}
+        />
+      )}
+
+      {corteOpen && (
+        <CorteSheet
+          sessions={sessions}
+          pagos={pagos}
+          gastos={gastos}
+          onClose={() => setCorteOpen(false)}
         />
       )}
     </>

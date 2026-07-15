@@ -10,6 +10,7 @@ import Gastos from './pages/Gastos'
 import Config from './pages/Config'
 import Clientes from './pages/Clientes'
 import SessionDetails from './components/SessionDetails'
+import GlobalSearch from './components/GlobalSearch'
 import { ToastProvider, useToast } from './hooks/useToast'
 import { ConfigProvider, useConfig } from './hooks/useConfig'
 import { ConfirmProvider } from './components/ConfirmDialog'
@@ -36,9 +37,26 @@ function AppInner() {
   const { config } = useConfig()
   const toast = useToast()
   const [selectedId, setSelectedId] = useState(null)
+  const [searchOpen, setSearchOpen] = useState(false)
   const location = useLocation()
 
   useEffect(() => { setSelectedId(null) }, [location.pathname])
+
+  // Búsqueda global: ⌘K / Ctrl+K, o "/" fuera de un campo de texto
+  useEffect(() => {
+    const onKey = (e) => {
+      const typing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) || e.target.isContentEditable
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setSearchOpen(v => !v)
+      } else if (e.key === '/' && !typing) {
+        e.preventDefault()
+        setSearchOpen(true)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   const currentSelected = selectedId ? (sessions.find(s => s.id === selectedId) || null) : null
 
@@ -273,13 +291,14 @@ function AppInner() {
     updateSession: updateSessionWithComision,
     deleteSession: deleteSessionWithComision,
     createPago: createPagoWithComision,
+    deletePago: deletePagoWithComision,
     fetch,
     onSelectSession,
   }
 
   return (
     <div className="app">
-      <Sidebar />
+      <Sidebar onSearch={() => setSearchOpen(true)} />
       <main className={`main${currentSelected ? ' panel-open' : ''}`}>
         {loadError && (
           <div className="app-error-banner" role="alert">
@@ -289,7 +308,7 @@ function AppInner() {
         )}
         <Routes>
           <Route path="/"             element={<Dashboard    {...shared} />} />
-          <Route path="/hoy"          element={<Hoy          {...shared} />} />
+          <Route path="/hoy"          element={<Hoy          {...shared} pagos={pagos} gastos={gastos} />} />
           <Route path="/agenda"       element={<Agenda       {...shared} />} />
           <Route path="/sesiones"     element={<Sesiones     {...shared} />} />
           <Route path="/clientes"     element={<Clientes sessions={sessions} loading={loading} onSelectSession={onSelectSession} />} />
@@ -308,6 +327,13 @@ function AppInner() {
           <Route path="/config"       element={<Config comisionSchemaReady={comisionSchemaReady} />} />
         </Routes>
       </main>
+      {searchOpen && (
+        <GlobalSearch
+          sessions={sessions}
+          onSelect={onSelectSession}
+          onClose={() => setSearchOpen(false)}
+        />
+      )}
       {currentSelected && (
         <>
           <div className="details-backdrop" onClick={() => setSelectedId(null)} />

@@ -14,7 +14,10 @@ const DEFAULT_CONFIG = {
   blocked_dates: [],
   reminder_message: 'Hola, {nombre}. Te damos la bienvenida a HAUS. Te recordamos que tu sesión está agendada para el día {fecha} a las {hora}. Te pedimos presentarte 10 minutos antes de tu horario. La duración de tu sesión es de 20 minutos y cada espacio se agenda cada media hora para poder atender cualquier contratiempo de forma puntual. ¡Te esperamos!',
   delivery_message: 'Hola, {nombre}. Muchas gracias por visitar HAUS. Tus fotos ya están listas. Te compartimos el vínculo de entrega: {link} Gracias por confiar en nosotros.',
-  wa_settings:       { on_booking: false, reminder_enabled: false, reminder_days: 1 },
+  wa_settings:       {
+    on_booking: false, reminder_enabled: false, reminder_days: 1,
+    cobranza_message: 'Hola, {nombre}. Te saludamos de HAUS. Tienes un saldo pendiente de {saldo} correspondiente a tu sesión del {fecha}. Puedes liquidarlo en efectivo, transferencia o tarjeta. ¡Gracias!',
+  },
   payment_settings:  { comision_tarjeta: 0 },
   stats_settings:    { stats_start: '', stats_end: '' },
 }

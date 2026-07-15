@@ -124,6 +124,11 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
         .replace(/{fecha}/g, fmtDate(s.fecha))
         .replace(/{hora}/g, s.hora?.slice(0, 5) || s.hora)
       updateSession(s.id, { reminder_sent: true })
+    } else if (type === 'cobranza') {
+      msg = (config.wa_settings?.cobranza_message || '')
+        .replace(/{nombre}/g, s.nombre)
+        .replace(/{saldo}/g, `$${(+s.restante || 0).toLocaleString()}`)
+        .replace(/{fecha}/g, fmtDate(s.fecha))
     } else {
       if (!s.link) { toast('Sin vínculo de fotos', 'error'); return }
       msg = (config.delivery_message || '')
@@ -263,6 +268,15 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
                   </div>
 
                   <div className="session-card-actions" onClick={e => e.stopPropagation()}>
+                    {+s.restante > 0 && !['Cancelada', 'No show'].includes(s.estatus) && (
+                      <button
+                        className="btn btn-wa btn-xs btn-icon"
+                        title={`Recordar saldo pendiente de $${(+s.restante).toLocaleString()} por WhatsApp`}
+                        onClick={e => openWA(s, 'cobranza', e)}
+                      >
+                        💰
+                      </button>
+                    )}
                     <button
                       className="btn btn-wa btn-xs btn-icon"
                       title="Recordatorio WhatsApp"

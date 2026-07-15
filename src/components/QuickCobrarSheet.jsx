@@ -7,7 +7,7 @@ const METHODS = [
   { key: 'tarjeta',       label: 'Tarjeta' },
 ]
 
-export default function QuickCobrarSheet({ session, onClose, updateSession, createPago }) {
+export default function QuickCobrarSheet({ session, onClose, updateSession, createPago, deletePago }) {
   const toast = useToast()
   const restante = +session?.restante || 0
   const [amount, setAmount] = useState(String(restante))
@@ -45,13 +45,24 @@ export default function QuickCobrarSheet({ session, onClose, updateSession, crea
       pagos:       (+session.pagos || 0) + value,
       estatus:     (newRestante === 0 && session.estatus === 'Pendiente de pago') ? 'Completada' : session.estatus,
     }
+    const prev = { estatus: session.estatus, metodo_pago: session.metodo_pago }
     const result = await updateSession(session.id, updates)
     if (result?.error) { toast(result.error, 'error'); setSaving(false); return }
+    let pagoId = null
     if (createPago) {
       const pr = await createPago(session.id, value, method)
       if (pr?.error) { toast('El cobro se aplicó pero no quedó en el historial de pagos', 'error'); setSaving(false); onClose(); return }
+      pagoId = pr?.data?.id || null
     }
-    toast(`$${value.toLocaleString()} cobrado ✓`, 'success')
+    toast(`$${value.toLocaleString()} cobrado ✓`, 'success', (pagoId && deletePago) ? {
+      action: {
+        label: 'Deshacer',
+        onClick: async () => {
+          await deletePago(pagoId)          // restaura pagos/restante y elimina la comisión
+          return updateSession(session.id, { estatus: prev.estatus, metodo_pago: prev.metodo_pago || null })
+        },
+      },
+    } : undefined)
     setSaving(false)
     onClose()
   }

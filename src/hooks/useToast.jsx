@@ -50,21 +50,41 @@ function humanize(raw) {
 }
 
 export function ToastProvider({ children }) {
-  const [toast, setToast] = useState({ msg: '', type: '', show: false })
+  const [toast, setToast] = useState({ msg: '', type: '', show: false, action: null })
   const timerRef = useRef(null)
 
-  const show = useCallback((rawMsg, type = '') => {
+  // opts.action = { label, onClick } — muestra un botón (p. ej. "Deshacer") y extiende la duración
+  const show = useCallback((rawMsg, type = '', opts = {}) => {
     const msg = type === 'error' ? humanize(rawMsg) : (typeof rawMsg === 'string' ? rawMsg : String(rawMsg ?? ''))
-    setToast({ msg, type, show: true })
+    const action = opts.action || null
+    setToast({ msg, type, show: true, action })
     if (timerRef.current) clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(() => setToast(t => ({ ...t, show: false })), 3000)
+    timerRef.current = setTimeout(
+      () => setToast(t => ({ ...t, show: false })),
+      opts.duration ?? (action ? 6000 : 3000),
+    )
   }, [])
+
+  const runAction = async () => {
+    const a = toast.action
+    if (timerRef.current) clearTimeout(timerRef.current)
+    setToast(t => ({ ...t, show: false }))
+    try {
+      const result = await a.onClick()
+      if (result?.error) show(result.error, 'error')
+    } catch { show('No se pudo deshacer', 'error') }
+  }
 
   return (
     <ToastCtx.Provider value={show}>
       {children}
       <div className={`toast ${toast.type} ${toast.show ? 'show' : ''}`} role="status" aria-live="polite">
-        {toast.msg}
+        <span>{toast.msg}</span>
+        {toast.action && (
+          <button className="toast-action" onClick={runAction}>
+            {toast.action.label}
+          </button>
+        )}
       </div>
     </ToastCtx.Provider>
   )

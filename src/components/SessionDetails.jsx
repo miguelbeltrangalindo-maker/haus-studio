@@ -57,9 +57,12 @@ export default function SessionDetails({ session, onClose, updateSession, delete
   const handleAdvance = async () => {
     if (!nextSt) return
     setAdvancing(true)
+    const prevStatus = session.estatus
     const result = await updateSession(session.id, { estatus: nextSt })
     if (result.error) toast(result.error, 'error')
-    else toast(`${session.nombre.split(' ')[0]} → ${nextSt}`, 'success')
+    else toast(`${session.nombre.split(' ')[0]} → ${nextSt}`, 'success', {
+      action: { label: 'Deshacer', onClick: () => updateSession(session.id, { estatus: prevStatus }) },
+    })
     setAdvancing(false)
   }
 
@@ -76,13 +79,24 @@ export default function SessionDetails({ session, onClose, updateSession, delete
       estatus:     (newRestante === 0 && session.estatus === 'Pendiente de pago') ? 'Completada' : session.estatus,
     }
     setPaying(true)
+    const prev = { estatus: session.estatus, metodo_pago: session.metodo_pago, pagos: session.pagos, restante: session.restante }
     const result = await updateSession(session.id, updates)
     if (result.error) { toast(result.error, 'error'); setPaying(false); return }
+    let pagoId = null
     if (createPago) {
       const pr = await createPago(session.id, amount, payMethod)
       if (pr?.error) { toast('El cobro se aplicó pero no quedó en el historial de pagos', 'error'); setPaying(false); return }
+      pagoId = pr?.data?.id || null
     }
-    toast(`$${amount.toLocaleString()} cobrado ✓`, 'success')
+    toast(`$${amount.toLocaleString()} cobrado ✓`, 'success', (pagoId && deletePago) ? {
+      action: {
+        label: 'Deshacer',
+        onClick: async () => {
+          await deletePago(pagoId)          // restaura pagos/restante y elimina la comisión
+          return updateSession(session.id, { estatus: prev.estatus, metodo_pago: prev.metodo_pago || null })
+        },
+      },
+    } : undefined)
     setPayAmount('')
     setPaying(false)
   }

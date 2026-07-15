@@ -106,10 +106,12 @@ export default function Gastos({ gastos = [], loading, tableError, createGasto, 
     e.preventDefault()
     if (!form.concepto.trim() || !form.monto) return
     setSaving(true)
-    const { error } = await createGasto({ ...form, monto: +form.monto })
+    const { data, error } = await createGasto({ ...form, monto: +form.monto })
     setSaving(false)
     if (error) { toast(error, 'error'); return }
-    toast('Gasto registrado', 'success')
+    toast('Gasto registrado', 'success', data?.id ? {
+      action: { label: 'Deshacer', onClick: () => deleteGasto(data.id) },
+    } : undefined)
     setForm({ concepto: '', monto: '', fecha: todayStr(), categoria: 'Otros', notas: '' })
     setShowForm(false)
   }

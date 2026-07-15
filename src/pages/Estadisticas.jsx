@@ -1,6 +1,6 @@
 import { format, parseISO, differenceInDays, addDays, eachDayOfInterval } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { todayStr } from '../lib/utils'
+import { todayStr, fmtDate } from '../lib/utils'
 import { useConfig } from '../hooks/useConfig'
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -30,6 +30,12 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
   const totalRestante  = rangeActive.reduce((a, s) => a + (+s.restante  || 0), 0)
 
   const totalDescuentos = rangeActive.reduce((a, s) => a + (+s.descuento || 0), 0)
+
+  // ── Descuentos ──
+  const conDescuento = rangeActive
+    .filter(s => +s.descuento > 0)
+    .sort((a, b) => (+b.descuento) - (+a.descuento))
+  const cobradoConDescuento = conDescuento.reduce((a, s) => a + (+s.anticipo || 0) + (+s.pagos || 0), 0)
 
   // Valor real por sesión = anticipo + pagos cobrados + saldo pendiente (descuentos ya aplicados al restante)
   const totalFacturado = rangeActive.reduce((a, s) =>
@@ -192,6 +198,16 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
     { label: 'Entregadas',               count: rangeActive.filter(s => s.estatus === 'Entregada').length, color: 'green' },
     { label: 'Canceladas / No show',     count: canceladas.length, color: 'red' },
   ]
+
+  const waCobranza = (s) => {
+    if (!s.telefono) return
+    const phone = '52' + s.telefono.replace(/\D/g, '').replace(/^52/, '')
+    const msg = (config.wa_settings?.cobranza_message || '')
+      .replace(/{nombre}/g, s.nombre)
+      .replace(/{saldo}/g, `$${(+s.restante || 0).toLocaleString()}`)
+      .replace(/{fecha}/g, fmtDate(s.fecha))
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank')
+  }
 
   const Kpi = ({ label, value, color }) => (
     <div className="stat-kpi">
@@ -374,7 +390,6 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
             <Kpi label="Total liquidado"     value={`$${totalLiquidado.toLocaleString()}`}    color="green" />
             <Kpi label="Con saldo pendiente" value={conDeuda.length}                          color={conDeuda.length > 0 ? 'amber' : ''} />
             <Kpi label="% cobrado"           value={`${pctCobrado}%`}                         color={pctCobrado >= 80 ? 'green' : 'amber'} />
-            {totalDescuentos > 0 && <Kpi label="Descuentos aplicados" value={`−$${totalDescuentos.toLocaleString()}`} color="red" />}
           </div>
           {conDeuda.length > 0 && (
             <div className="card" style={{ marginTop: 12, padding: '14px 20px' }}>
@@ -385,12 +400,54 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
                   <div className="breakdown-right">
                     <span className="breakdown-date">{s.fecha}</span>
                     <span className="breakdown-amount amber">${(+s.restante).toLocaleString()}</span>
+                    {s.telefono && (
+                      <button
+                        className="btn btn-wa btn-xs btn-icon"
+                        title="Recordar saldo por WhatsApp"
+                        onClick={() => waCobranza(s)}
+                      >
+                        💰
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
           )}
         </div>
+
+        {/* ── Descuentos ── */}
+        {conDescuento.length > 0 && (
+          <div className="stats-block">
+            <div className="section-title">Descuentos</div>
+            <div className="stat-kpis">
+              <Kpi label="Total otorgado"          value={`−$${totalDescuentos.toLocaleString()}`}       color="red" />
+              <Kpi label="Sesiones con descuento"  value={conDescuento.length} />
+              <Kpi label="Cobrado en esas sesiones" value={`$${cobradoConDescuento.toLocaleString()}`}    color="green" />
+              <Kpi label="Descuento promedio"      value={`$${Math.round(totalDescuentos / conDescuento.length).toLocaleString()}`} />
+            </div>
+            <div className="card" style={{ marginTop: 12, padding: '14px 20px' }}>
+              <div className="section-title" style={{ marginBottom: 10 }}>Sesiones con descuento</div>
+              {conDescuento.map(s => (
+                <div key={s.id} className="breakdown-row">
+                  <div className="breakdown-label">{s.nombre}</div>
+                  <div className="breakdown-right">
+                    <span className="breakdown-date">{s.fecha}</span>
+                    <span className="breakdown-amount" style={{ color: 'var(--red)' }}>
+                      −${(+s.descuento).toLocaleString()}
+                    </span>
+                    <span className="breakdown-amount green" style={{ minWidth: 76, textAlign: 'right' }}>
+                      ${((+s.anticipo || 0) + (+s.pagos || 0)).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              ))}
+              <div style={{ marginTop: 10, fontSize: 11.5, color: 'var(--text3)' }}>
+                Monto rojo: descuento otorgado · Monto verde: lo realmente cobrado en esa sesión
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Cobros por método ── */}
         <div className="stats-block">
