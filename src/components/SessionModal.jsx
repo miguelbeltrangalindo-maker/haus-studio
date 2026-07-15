@@ -15,7 +15,7 @@ const ANTICIPO_METHODS = [
   { key: 'cupon',         label: 'Cupón' },
 ]
 
-export default function SessionModal({ session, prefillDate, prefillHora, onSave, onClose, onDelete, sessions = [] }) {
+export default function SessionModal({ session, prefillDate, prefillHora, onSave, onClose, onDelete, createPago, sessions = [] }) {
   const { config } = useConfig()
   const toast = useToast()
   const isNew = !session?.id
@@ -52,6 +52,11 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
   }, [session])
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+
+  // Descuento: solo la diferencia vs. lo ya aplicado ajusta el saldo
+  const origDesc  = +(session?.descuento || 0)
+  const descDelta = (+form.descuento || 0) - origDesc
+  const maxDesc   = (+form.restante || 0) + origDesc
 
   // Unique clients derived from session history
   const clients = useMemo(() => {
@@ -128,6 +133,10 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
       descuento: toNum(form.descuento),
       pagos:     toNum(form.pagos),
     }
+    // Si el descuento cambió, el saldo por cobrar se ajusta por la diferencia
+    if (descDelta !== 0) {
+      payload.restante = Math.max(0, (+form.restante || 0) - descDelta)
+    }
     setSaving(true)
     await onSave(payload)
     setSaving(false)
@@ -137,7 +146,8 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
   const handleCobrar = async () => {
     const amount = +payAmount
     if (!amount || amount <= 0) { toast('Ingresa un monto válido', 'error'); return }
-    const currentRestante = +form.restante || 0
+    // Saldo efectivo considerando cambios de descuento aún no guardados
+    const currentRestante = Math.max(0, (+form.restante || 0) - descDelta)
     if (amount > currentRestante) { toast(`El monto no puede superar $${currentRestante.toLocaleString()}`, 'error'); return }
     const newRestante = Math.max(0, currentRestante - amount)
     const updated = {
@@ -149,7 +159,13 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
       estatus: (newRestante === 0 && form.estatus === 'Pendiente de pago') ? 'Completada' : form.estatus,
     }
     setSaving(true)
-    await onSave(updated)
+    const result = await onSave(updated)
+    if (result?.error) { setSaving(false); return }
+    // Registrar el cobro en el historial (y su comisión si aplica)
+    if (createPago && session?.id) {
+      const pr = await createPago(session.id, amount, payMethod)
+      if (pr?.error) toast('El cobro se aplicó pero no quedó en el historial de pagos', 'error')
+    }
     setSaving(false)
   }
 
@@ -253,12 +269,12 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
             <label className="form-label">
               Personas {form.personas > 4 && <span style={{ color: 'var(--amber-l)', fontSize: 11 }}>+{form.personas - 4} cargo extra</span>}
             </label>
-            <input className="form-input" type="number" min="1" max="20" value={form.personas}
+            <input className="form-input" type="number" inputMode="numeric" min="1" max="20" value={form.personas}
               onChange={e => set('personas', +e.target.value)} />
           </div>
           <div className="form-group">
             <label className="form-label">Niños menores de 2 años</label>
-            <input className="form-input" type="number" min="0" max="5" value={form.ninos}
+            <input className="form-input" type="number" inputMode="numeric" min="0" max="5" value={form.ninos}
               onChange={e => set('ninos', Math.min(5, Math.max(0, +e.target.value)))} />
           </div>
           <div className="form-group">
@@ -277,7 +293,7 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
             <label className="form-label">
               {form.metodo_anticipo === 'cupon' ? 'Costo de sesión (cupón) *' : 'Anticipo recibido ($)'}
             </label>
-            <input className="form-input" type="number" min="0" value={form.anticipo}
+            <input className="form-input" type="number" inputMode="decimal" min="0" value={form.anticipo}
               onChange={e => set('anticipo', e.target.value)}
               placeholder={form.metodo_anticipo === 'cupon' ? 'Costo total de la sesión' : '0'} />
           </div>
@@ -297,24 +313,23 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
             </div>
           </div>
           <div className="form-group">
-            <label className="form-label">Saldo pendiente ($)</label>
-            <input className="form-input" type="number" min="0" value={form.restante}
+            <label className="form-label">Por cobrar ($)</label>
+            <input className="form-input" type="number" inputMode="decimal" min="0" value={form.restante}
               onChange={e => set('restante', e.target.value)} placeholder="0" />
           </div>
           <div className="form-group">
             <label className="form-label">Descuento ($)</label>
-            <input className="form-input" type="number" min="0"
+            <input className="form-input" type="number" inputMode="decimal" min="0"
               value={form.descuento || ''}
               onChange={e => {
                 const desc = +e.target.value || 0
-                const restante = +form.restante || 0
-                if (desc > restante) { set('descuento', restante); return }
+                if (desc > maxDesc) { set('descuento', maxDesc); return }
                 set('descuento', e.target.value)
               }}
               placeholder="0" />
-            {(+form.descuento > 0) && (
+            {descDelta !== 0 && (
               <div style={{ fontSize: 12, color: 'var(--green-l)', marginTop: 4 }}>
-                Saldo después del descuento: ${Math.max(0, (+form.restante || 0) - (+form.descuento || 0)).toLocaleString()}
+                Al guardar, el saldo por cobrar quedará en ${Math.max(0, (+form.restante || 0) - descDelta).toLocaleString()}
               </div>
             )}
           </div>
@@ -334,11 +349,11 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
         {hasPending && (
           <>
             <div className="modal-section-title" style={{ color: 'var(--amber-l)' }}>
-              Cobrar saldo pendiente
+              Cobrar saldo
             </div>
             <div className="payment-panel">
               <div className="payment-summary">
-                <span className="payment-summary-label">Saldo pendiente</span>
+                <span className="payment-summary-label">Por cobrar</span>
                 <span className="payment-summary-amount">${(+form.restante).toLocaleString()}</span>
               </div>
 
@@ -348,6 +363,7 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
                   <input
                     className="form-input"
                     type="number"
+                    inputMode="decimal"
                     min="1"
                     max={form.restante}
                     value={payAmount}
@@ -378,7 +394,7 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
                   onClick={handleCobrar}
                   disabled={saving || !payAmount || +payAmount <= 0}
                 >
-                  {saving ? 'Guardando…' : 'Cobrar y guardar'}
+                  {saving ? 'Guardando…' : (+payAmount > 0 ? `Cobrar $${(+payAmount).toLocaleString()}` : 'Cobrar')}
                 </button>
                 {payAmount && +payAmount > 0 && +payAmount < +form.restante && (
                   <span style={{ fontSize: 12, color: 'var(--text3)' }}>

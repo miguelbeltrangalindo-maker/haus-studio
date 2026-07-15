@@ -3,7 +3,8 @@ import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths } f
 import { es } from 'date-fns/locale'
 import { todayStr } from '../lib/utils'
 import { useToast } from '../hooks/useToast'
-import { exportGastos } from '../lib/exportExcel'
+import { useConfirm } from '../components/ConfirmDialog'
+import { SkeletonRows, EmptyState } from '../components/Skeleton'
 
 const CATEGORIAS = ['Equipo', 'Renta', 'Servicios', 'Marketing', 'Sueldos', 'Comisión bancaria', 'Otros']
 
@@ -37,6 +38,7 @@ function getRange(key) {
 
 export default function Gastos({ gastos = [], loading, tableError, createGasto, updateGasto, deleteGasto }) {
   const toast = useToast()
+  const confirm = useConfirm()
 
   // ── form ──
   const [showForm, setShowForm]   = useState(false)
@@ -128,7 +130,13 @@ export default function Gastos({ gastos = [], loading, tableError, createGasto, 
   }
 
   const handleDelete = async (id, concepto) => {
-    if (!confirm(`¿Eliminar "${concepto}"?`)) return
+    const ok = await confirm({
+      title: `Eliminar gasto`,
+      message: `"${concepto}"\n\nEsta acción no se puede deshacer.`,
+      confirmLabel: 'Eliminar',
+      destructive: true,
+    })
+    if (!ok) return
     const { error } = await deleteGasto(id)
     if (error) toast(error, 'error')
     else toast('Gasto eliminado')
@@ -166,7 +174,7 @@ export default function Gastos({ gastos = [], loading, tableError, createGasto, 
         <div className="topbar-right">
           <button
             className="btn btn-ghost btn-sm"
-            onClick={() => exportGastos(filtered)}
+            onClick={async () => (await import('../lib/exportExcel')).exportGastos(filtered)}
             title="Exportar a Excel"
             disabled={filtered.length === 0}
           >
@@ -190,7 +198,7 @@ export default function Gastos({ gastos = [], loading, tableError, createGasto, 
               </div>
               <div className="form-field">
                 <label className="form-label">Monto *</label>
-                <input className="form-input" type="number" min="0" step="0.01" placeholder="0.00"
+                <input className="form-input" type="number" inputMode="decimal" min="0" step="0.01" placeholder="0.00"
                   value={form.monto} onChange={e => setForm(p => ({ ...p, monto: e.target.value }))} required />
               </div>
               <div className="form-field">
@@ -304,11 +312,33 @@ export default function Gastos({ gastos = [], loading, tableError, createGasto, 
         </div>
 
         {loading ? (
-          <div className="loading">Cargando…</div>
-        ) : filtered.length === 0 ? (
-          <div style={{ padding: '48px 24px', textAlign: 'center', color: 'var(--text3)', fontSize: 14 }}>
-            Sin gastos en el período seleccionado
+          <div className="card" style={{ padding: 0 }}>
+            <SkeletonRows count={4} />
           </div>
+        ) : filtered.length === 0 ? (
+          gastos.length === 0 ? (
+            <EmptyState
+              glyph="◯"
+              title="Aún no hay gastos"
+              sub="Registra tu primer gasto para empezar a ver el balance del estudio."
+              action={
+                <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>
+                  + Registrar primer gasto
+                </button>
+              }
+            />
+          ) : (
+            <EmptyState
+              glyph="—"
+              title="Sin gastos en este período"
+              sub="Cambia el rango o limpia los filtros para ver más resultados."
+              action={
+                <button className="btn btn-sm" onClick={() => { setQuickRange(''); setShowCustom(false); setCatFilter('') }}>
+                  Ver todos
+                </button>
+              }
+            />
+          )
         ) : view === 'lista' ? (
           /* ── Vista Lista ── */
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -324,7 +354,7 @@ export default function Gastos({ gastos = [], loading, tableError, createGasto, 
                       </div>
                       <div className="form-field">
                         <label className="form-label">Monto</label>
-                        <input className="form-input" type="number" min="0" step="0.01" value={editForm.monto}
+                        <input className="form-input" type="number" inputMode="decimal" min="0" step="0.01" value={editForm.monto}
                           onChange={e => setEditForm(p => ({ ...p, monto: e.target.value }))} />
                       </div>
                       <div className="form-field">

@@ -2,7 +2,6 @@ import { format, parseISO, differenceInDays, addDays, eachDayOfInterval } from '
 import { es } from 'date-fns/locale'
 import { todayStr } from '../lib/utils'
 import { useConfig } from '../hooks/useConfig'
-import { exportEstadisticas } from '../lib/exportExcel'
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   PieChart, Pie, Cell, Legend, BarChart, Bar,
@@ -12,8 +11,8 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
   const { config } = useConfig()
 
   const today = todayStr()
-  const effectiveStart = config.stats_start || today
-  const effectiveEnd   = config.stats_end || format(addDays(new Date(), 29), 'yyyy-MM-dd')
+  const effectiveStart = config.stats_settings?.stats_start || today
+  const effectiveEnd   = config.stats_settings?.stats_end   || format(addDays(new Date(), 29), 'yyyy-MM-dd')
 
   const rangeLabel = (() => {
     try {
@@ -209,7 +208,7 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
           <span style={{ fontSize: 12, color: 'var(--text3)' }}>{rangeLabel}</span>
           <button
             className="btn btn-ghost btn-sm"
-            onClick={() => exportEstadisticas({
+            onClick={async () => (await import('../lib/exportExcel')).exportEstadisticas({
               sessions,
               gastos,
               pagos,

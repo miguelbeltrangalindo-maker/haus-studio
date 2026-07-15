@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { fmtDate, initials } from '../lib/utils'
 import Badge from '../components/Badge'
-import { exportClientes } from '../lib/exportExcel'
+import { SkeletonRows, EmptyState } from '../components/Skeleton'
 
 export default function Clientes({ sessions = [], loading, onSelectSession }) {
   const [search, setSearch]     = useState('')
@@ -69,7 +69,7 @@ export default function Clientes({ sessions = [], loading, onSelectSession }) {
           </span>
           <button
             className="btn btn-ghost btn-sm"
-            onClick={() => exportClientes(sessions)}
+            onClick={async () => (await import('../lib/exportExcel')).exportClientes(sessions)}
             title="Exportar clientes a Excel"
             disabled={sessions.length === 0}
           >
@@ -101,9 +101,28 @@ export default function Clientes({ sessions = [], loading, onSelectSession }) {
         </div>
 
         {loading ? (
-          <div className="loading">Cargando…</div>
+          <div className="card" style={{ padding: 0 }}>
+            <SkeletonRows count={4} />
+          </div>
         ) : filtered.length === 0 ? (
-          <div className="empty-state">Sin clientes que coincidan</div>
+          clientes.length === 0 ? (
+            <EmptyState
+              glyph="◯"
+              title="Aún no hay clientes"
+              sub="Los clientes aparecen aquí cuando creas sesiones con su nombre y teléfono."
+            />
+          ) : (
+            <EmptyState
+              glyph="—"
+              title="Sin coincidencias"
+              sub="Ningún cliente cumple con la búsqueda actual."
+              action={
+                <button className="btn btn-sm" onClick={() => setSearch('')}>
+                  Limpiar búsqueda
+                </button>
+              }
+            />
+          )
         ) : (
           <div className="card" style={{ padding: 0 }}>
             {filtered.map(c => (
@@ -173,11 +192,7 @@ export default function Clientes({ sessions = [], loading, onSelectSession }) {
                           padding: '10px 20px', borderBottom: '1px solid var(--border)',
                           cursor: 'pointer',
                         }}
-                        onClick={() => {
-                          if (window.matchMedia('(min-width: 769px)').matches) {
-                            onSelectSession?.(s)
-                          }
-                        }}
+                        onClick={() => onSelectSession?.(s)}
                       >
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text1)' }}>

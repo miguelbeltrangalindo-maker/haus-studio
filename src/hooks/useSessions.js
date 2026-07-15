@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 export function useSessions() {
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
 
   const fetch = useCallback(async () => {
     setLoading(true)
@@ -12,7 +13,12 @@ export function useSessions() {
       .select('*')
       .order('fecha', { ascending: false })
       .order('hora', { ascending: true })
-    if (!error) setSessions(data || [])
+    if (error) {
+      setLoadError(true)
+    } else {
+      setSessions(data || [])
+      setLoadError(false)
+    }
     setLoading(false)
   }, [])
 
@@ -84,5 +90,5 @@ export function useSessions() {
     return {}
   }
 
-  return { sessions, loading, fetch, createSession, updateSession, deleteSession }
+  return { sessions, loading, loadError, fetch, createSession, updateSession, deleteSession }
 }

@@ -4,6 +4,7 @@ import { initials, statusClass } from '../lib/utils'
 import Badge from '../components/Badge'
 import SessionModal from '../components/SessionModal'
 import { useToast } from '../hooks/useToast'
+import { useNowMinutes } from '../hooks/useNowMinutes'
 
 const KpiIcon = ({ children, color }) => (
   <div className={`dash-kpi-icon ${color}`}>{children}</div>
@@ -20,7 +21,7 @@ export default function DashboardDesktop({
   const navigate = useNavigate()
   const [modal, setModal] = useState(false)
 
-  const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes()
+  const nowMinutes = useNowMinutes()
   const featuredEta = (() => {
     if (!featuredSession) return null
     if (featuredSession.estatus === 'En sesión') return 'EN SESIÓN · AHORA'
@@ -40,7 +41,11 @@ export default function DashboardDesktop({
   }
 
   const SessionRow = ({ s }) => (
-    <div className="session-row" style={{ cursor: 'pointer' }} onClick={() => navigate('/sesiones')}>
+    <div
+      className="session-row"
+      style={{ cursor: 'pointer' }}
+      onClick={() => onSelectSession ? onSelectSession(s) : navigate('/hoy')}
+    >
       <div className="avatar">{initials(s.nombre)}</div>
       <div className="session-row-info">
         <div className="session-row-name">{s.nombre}</div>

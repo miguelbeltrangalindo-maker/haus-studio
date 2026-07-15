@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { fmtDate, nextStatus, nextStatusLabel } from '../lib/utils'
 import { useConfig } from '../hooks/useConfig'
 import { useToast } from '../hooks/useToast'
+import { useConfirm } from './ConfirmDialog'
 import Badge from './Badge'
 import SessionModal from './SessionModal'
 
@@ -16,6 +17,7 @@ const METHOD_LABEL = { efectivo: 'Efectivo', transferencia: 'Transferencia', tar
 export default function SessionDetails({ session, onClose, updateSession, deleteSession, sessionPagos = [], createPago, updatePago, deletePago, sessionExtras = [], createExtra, updateExtra, deleteExtra, sessions = [] }) {
   const { config } = useConfig()
   const toast = useToast()
+  const confirm = useConfirm()
   const [editOpen, setEditOpen]   = useState(false)
   const [advancing, setAdvancing] = useState(false)
   const [syncing, setSyncing]     = useState(false)
@@ -31,6 +33,11 @@ export default function SessionDetails({ session, onClose, updateSession, delete
   const [editPagoMonto,  setEditPagoMonto]  = useState('')
   const [editPagoMetodo, setEditPagoMetodo] = useState('efectivo')
   const [savingPago,     setSavingPago]     = useState(false)
+  // ── Eliminación con doble confirmación ──
+  const [deleteStep,   setDeleteStep]   = useState(0) // 0=hidden, 1=impact, 2=final
+  const [deleting,     setDeleting]     = useState(false)
+
+  useEffect(() => { setDeleteStep(0) }, [session.id])
 
   if (!session) return null
 
@@ -71,7 +78,10 @@ export default function SessionDetails({ session, onClose, updateSession, delete
     setPaying(true)
     const result = await updateSession(session.id, updates)
     if (result.error) { toast(result.error, 'error'); setPaying(false); return }
-    if (createPago) await createPago(session.id, amount, payMethod)
+    if (createPago) {
+      const pr = await createPago(session.id, amount, payMethod)
+      if (pr?.error) { toast('El cobro se aplicó pero no quedó en el historial de pagos', 'error'); setPaying(false); return }
+    }
     toast(`$${amount.toLocaleString()} cobrado ✓`, 'success')
     setPayAmount('')
     setPaying(false)
@@ -90,7 +100,12 @@ export default function SessionDetails({ session, onClose, updateSession, delete
     if (!monto || monto <= 0) { toast('Ingresa un monto válido', 'error'); return }
     const restante = +session.restante || 0
     if (monto > restante) { toast(`El descuento no puede superar $${restante.toLocaleString()}`, 'error'); return }
-    if (!confirm(`¿Aplicar descuento de $${monto.toLocaleString()}?\n\nEl saldo pendiente pasará de $${restante.toLocaleString()} a $${(restante - monto).toLocaleString()}.`)) return
+    const ok = await confirm({
+      title: `Aplicar descuento de $${monto.toLocaleString()}`,
+      message: `El saldo por cobrar pasará de $${restante.toLocaleString()} a $${(restante - monto).toLocaleString()}.`,
+      confirmLabel: `Aplicar $${monto.toLocaleString()}`,
+    })
+    if (!ok) return
     setApplyingDesc(true)
     const newDesc = (+session.descuento || 0) + monto
     await updateSession(session.id, {
@@ -100,6 +115,25 @@ export default function SessionDetails({ session, onClose, updateSession, delete
     toast(`Descuento de $${monto.toLocaleString()} aplicado`, 'success')
     setDescuento('')
     setApplyingDesc(false)
+  }
+
+  const handleRevertDescuento = async () => {
+    const desc = +session.descuento || 0
+    if (!desc) return
+    const restante = +session.restante || 0
+    const ok = await confirm({
+      title: `Quitar descuento de $${desc.toLocaleString()}`,
+      message: `El saldo por cobrar volverá a $${(restante + desc).toLocaleString()}.`,
+      confirmLabel: 'Quitar descuento',
+      destructive: true,
+    })
+    if (!ok) return
+    const result = await updateSession(session.id, {
+      restante:  String(restante + desc),
+      descuento: '0',
+    })
+    if (result?.error) { toast(result.error, 'error'); return }
+    toast('Descuento eliminado — saldo restaurado')
   }
 
   const conceptos = config.extra_conceptos || []
@@ -125,7 +159,13 @@ export default function SessionDetails({ session, onClose, updateSession, delete
 
   const handleDeleteExtra = async (extra) => {
     const qty = extra.cantidad > 1 ? ` ×${extra.cantidad}` : ''
-    if (!confirm(`¿Estás seguro de eliminar el cargo "${extra.concepto}${qty}" por $${(+extra.monto).toLocaleString()}?\n\nEste monto se descontará del saldo pendiente.`)) return
+    const ok = await confirm({
+      title: `Eliminar cargo`,
+      message: `${extra.concepto}${qty} · $${(+extra.monto).toLocaleString()}\n\nEste monto se restará del saldo por cobrar.`,
+      confirmLabel: 'Eliminar cargo',
+      destructive: true,
+    })
+    if (!ok) return
     await deleteExtra(extra.id)
     const newRestante = Math.max(0, (+session.restante || 0) - (+extra.monto || 0))
     await updateSession(session.id, { restante: String(newRestante) })
@@ -169,7 +209,13 @@ export default function SessionDetails({ session, onClose, updateSession, delete
   }
 
   const handleDeletePago = async (p) => {
-    if (!confirm(`¿Eliminar este pago de $${(+p.monto).toLocaleString()} (${METHOD_LABEL[p.metodo] || p.metodo})?\n\nEl saldo pendiente de la sesión se ajustará automáticamente.`)) return
+    const ok = await confirm({
+      title: `Eliminar este cobro`,
+      message: `$${(+p.monto).toLocaleString()} · ${METHOD_LABEL[p.metodo] || p.metodo}\n\nEl saldo por cobrar se ajustará automáticamente.`,
+      confirmLabel: 'Eliminar cobro',
+      destructive: true,
+    })
+    if (!ok) return
     const { error } = await deletePago(p.id)
     if (error) { toast(error, 'error'); return }
     toast('Pago eliminado — saldo actualizado')
@@ -177,21 +223,30 @@ export default function SessionDetails({ session, onClose, updateSession, delete
 
   const handleSave = async (form) => {
     const result = await updateSession(session.id, form)
-    if (result.error) { toast(result.error, 'error'); return }
+    if (result.error) { toast(result.error, 'error'); return result }
     toast('Sesión actualizada', 'success')
     setEditOpen(false)
+    return result
   }
 
   const handleDelete = async () => {
-    if (!confirm('¿Cancelar esta sesión?')) return
+    const ok = await confirm({
+      title: 'Cancelar esta sesión',
+      message: `${session.nombre} · ${fmtDate(session.fecha)}\n\nLa sesión queda con estatus "Cancelada" pero los registros se conservan.`,
+      confirmLabel: 'Cancelar sesión',
+      cancelLabel: 'No, mantener',
+      destructive: true,
+    })
+    if (!ok) return
     await updateSession(session.id, { estatus: 'Cancelada' })
     toast('Sesión cancelada')
     onClose()
   }
 
   const handleDeletePermanent = async () => {
-    if (!confirm(`¿Eliminar permanentemente la sesión de ${session.nombre}?\n\nSe borrarán todos los pagos y cargos asociados. Esta acción no se puede deshacer.`)) return
+    setDeleting(true)
     const result = await deleteSession(session.id)
+    setDeleting(false)
     if (result?.error) { toast(result.error, 'error'); return }
     toast('Sesión eliminada', 'success')
     onClose()
@@ -199,7 +254,10 @@ export default function SessionDetails({ session, onClose, updateSession, delete
 
   return (
     <>
-      <aside className="details-panel open">
+      <aside className="details-panel open" role="dialog" aria-modal="true" aria-label="Detalles de la sesión">
+
+        {/* Drag handle (mobile only via CSS) */}
+        <div className="dp-grip" onClick={onClose} aria-hidden="true" />
 
         {/* Header */}
         <div className="dp-header">
@@ -347,21 +405,30 @@ export default function SessionDetails({ session, onClose, updateSession, delete
         )}
 
         {/* Descuento */}
-        {hasPending && (
+        {(hasPending || +session.descuento > 0) && (
           <div className="dp-section">
             <div className="dp-section-label">Descuento</div>
             {+session.descuento > 0 && (
               <div className="dp-meta-row" style={{ marginBottom: 8 }}>
                 <span className="dp-meta-label">Descuento aplicado</span>
-                <span className="dp-meta-value" style={{ color: 'var(--green-l)' }}>
-                  −${(+session.descuento).toLocaleString()}
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className="dp-meta-value" style={{ color: 'var(--green-l)' }}>
+                    −${(+session.descuento).toLocaleString()}
+                  </span>
+                  <button
+                    onClick={handleRevertDescuento}
+                    title="Quitar descuento (restaura el saldo)"
+                    style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0 }}
+                  >×</button>
                 </span>
               </div>
             )}
+            {hasPending && (
             <div style={{ display: 'flex', gap: 8 }}>
               <input
                 className="form-input"
                 type="number"
+                inputMode="decimal"
                 min="1"
                 max={session.restante}
                 value={descuento}
@@ -378,6 +445,7 @@ export default function SessionDetails({ session, onClose, updateSession, delete
                 {applyingDesc ? '…' : 'Aplicar'}
               </button>
             </div>
+            )}
           </div>
         )}
 
@@ -389,12 +457,27 @@ export default function SessionDetails({ session, onClose, updateSession, delete
               <input
                 className="form-input"
                 type="number"
+                inputMode="decimal"
                 min="1"
                 max={session.restante}
                 value={payAmount}
                 onChange={e => setPayAmount(e.target.value)}
                 placeholder={`Máx. $${(+session.restante).toLocaleString()}`}
               />
+              {!payAmount && +session.restante > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setPayAmount(String(+session.restante))}
+                  style={{
+                    background: 'transparent', border: '1px dashed var(--border2)',
+                    borderRadius: 'var(--r3)', padding: '6px 10px',
+                    fontSize: 11.5, color: 'var(--text2)', cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  Liquidar todo · ${(+session.restante).toLocaleString()}
+                </button>
+              )}
               <div className="method-tabs">
                 {METHODS.map(m => (
                   <button
@@ -412,7 +495,7 @@ export default function SessionDetails({ session, onClose, updateSession, delete
                 onClick={handleCobrar}
                 disabled={paying || !payAmount || +payAmount <= 0}
               >
-                {paying ? 'Guardando…' : 'Cobrar y guardar'}
+                {paying ? 'Guardando…' : (+payAmount > 0 ? `Cobrar $${(+payAmount).toLocaleString()}` : 'Cobrar')}
               </button>
               {payAmount && +payAmount >= +session.restante && (
                 <span style={{ fontSize: 12, color: 'var(--green-l)', textAlign: 'center' }}>Saldo liquidado ✓</span>
@@ -439,6 +522,7 @@ export default function SessionDetails({ session, onClose, updateSession, delete
                         <input
                           className="form-input"
                           type="number"
+                          inputMode="decimal"
                           min="0.01"
                           step="0.01"
                           value={editPagoMonto}
@@ -600,16 +684,111 @@ export default function SessionDetails({ session, onClose, updateSession, delete
           <button className="btn btn-danger btn-sm" onClick={handleDelete} style={{ width: '100%' }}>
             Cancelar sesión
           </button>
-          {deleteSession && (
+          {deleteSession && deleteStep === 0 && (
             <button
               className="btn btn-sm"
-              onClick={handleDeletePermanent}
+              onClick={() => setDeleteStep(1)}
               style={{ width: '100%', color: 'var(--red)', borderColor: 'var(--red)', marginTop: 2 }}
             >
               Eliminar permanentemente
             </button>
           )}
         </div>
+
+        {/* ── Doble confirmación de eliminación ── */}
+        {deleteSession && deleteStep >= 1 && (() => {
+          const totalPagos  = sessionPagos.reduce((s, p) => s + (+p.monto || 0), 0)
+          const totalExtras = sessionExtras.reduce((s, e) => s + (+e.monto || 0), 0)
+          const comisionPagos = sessionPagos.filter(p => p.metodo === 'tarjeta').length
+          const hasAnticipo   = +session.anticipo > 0
+          const hasAntComis   = session.metodo_anticipo === 'tarjeta' && hasAnticipo
+          const comisionCount = (hasAntComis ? 1 : 0) + comisionPagos
+
+          return (
+            <div style={{
+              margin: '8px 0 0',
+              border: '1px solid var(--red)',
+              borderRadius: 'var(--r2)',
+              overflow: 'hidden',
+            }}>
+              {deleteStep === 1 && (
+                <div style={{ padding: '14px 16px' }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--red)', marginBottom: 10 }}>
+                    ⚠ Registros que se eliminarán
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 12 }}>
+                    {hasAnticipo && (
+                      <div className="dp-meta-row">
+                        <span className="dp-meta-label">Anticipo</span>
+                        <span className="dp-meta-value" style={{ color: 'var(--text2)' }}>
+                          ${(+session.anticipo).toLocaleString()}
+                          {session.metodo_anticipo ? <span style={{ color: 'var(--text3)', marginLeft: 4, textTransform: 'capitalize' }}>({session.metodo_anticipo})</span> : null}
+                        </span>
+                      </div>
+                    )}
+                    {sessionPagos.length > 0 && (
+                      <div className="dp-meta-row">
+                        <span className="dp-meta-label">Cobros de saldo ({sessionPagos.length})</span>
+                        <span className="dp-meta-value" style={{ color: 'var(--text2)' }}>${totalPagos.toLocaleString()}</span>
+                      </div>
+                    )}
+                    {sessionExtras.length > 0 && (
+                      <div className="dp-meta-row">
+                        <span className="dp-meta-label">Cargos adicionales ({sessionExtras.length})</span>
+                        <span className="dp-meta-value" style={{ color: 'var(--text2)' }}>${totalExtras.toLocaleString()}</span>
+                      </div>
+                    )}
+                    {comisionCount > 0 && (
+                      <div className="dp-meta-row">
+                        <span className="dp-meta-label">Comisiones bancarias</span>
+                        <span className="dp-meta-value" style={{ color: 'var(--red)' }}>{comisionCount} gasto{comisionCount > 1 ? 's' : ''} auto</span>
+                      </div>
+                    )}
+                    {!hasAnticipo && sessionPagos.length === 0 && sessionExtras.length === 0 && comisionCount === 0 && (
+                      <div style={{ fontSize: 12, color: 'var(--text3)' }}>Sin registros financieros vinculados</div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      className="btn btn-sm"
+                      onClick={() => setDeleteStep(2)}
+                      style={{ flex: 1, color: 'var(--red)', borderColor: 'var(--red)' }}
+                    >
+                      Entiendo, continuar →
+                    </button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setDeleteStep(0)}>
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {deleteStep === 2 && (
+                <div style={{ padding: '14px 16px', background: 'color-mix(in srgb, var(--red) 8%, transparent)' }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--red)', marginBottom: 6 }}>
+                    Esta acción NO puede deshacerse
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 12, lineHeight: 1.5 }}>
+                    Se eliminarán permanentemente la sesión de <strong>{session.nombre}</strong> y todos sus registros financieros asociados.
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      className="btn btn-sm btn-danger"
+                      onClick={handleDeletePermanent}
+                      disabled={deleting}
+                      style={{ flex: 1 }}
+                    >
+                      {deleting ? 'Eliminando…' : 'Eliminar definitivamente'}
+                    </button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setDeleteStep(0)} disabled={deleting}>
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })()}
 
       </aside>
 
@@ -619,6 +798,7 @@ export default function SessionDetails({ session, onClose, updateSession, delete
           onSave={handleSave}
           onClose={() => setEditOpen(false)}
           onDelete={handleDelete}
+          createPago={createPago}
           sessions={sessions}
         />
       )}

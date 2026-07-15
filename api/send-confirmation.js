@@ -9,8 +9,8 @@ export default async function handler(req, res) {
   if (!session_id) return res.status(400).json({ error: 'session_id required' })
 
   const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_KEY
+    process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
   )
 
   const { data: session, error } = await supabase

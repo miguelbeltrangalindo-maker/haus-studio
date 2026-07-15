@@ -4,12 +4,14 @@ import { es } from 'date-fns/locale'
 import { getTimeSlots, statusClass, weekDays, fmtDate, todayStr } from '../lib/utils'
 import { useConfig } from '../hooks/useConfig'
 import { useToast } from '../hooks/useToast'
+import { useConfirm } from '../components/ConfirmDialog'
 import Badge from '../components/Badge'
 import SessionModal from '../components/SessionModal'
 
-export default function Agenda({ sessions, createSession, updateSession, onSelectSession }) {
+export default function Agenda({ sessions, createSession, updateSession, createPago, onSelectSession }) {
   const { config } = useConfig()
   const toast = useToast()
+  const confirm = useConfirm()
   const [view, setView] = useState('day')
   const [current, setCurrent] = useState(new Date())
   const [modal, setModal] = useState(null)
@@ -61,14 +63,22 @@ export default function Agenda({ sessions, createSession, updateSession, onSelec
     } else {
       result = await createSession(form)
     }
-    if (result.error) { toast(result.error, 'error'); return }
+    if (result.error) { toast(result.error, 'error'); return result }
     toast(modal?.session?.id ? 'Sesión actualizada' : 'Sesión creada', 'success')
     setModal(null)
+    return result
   }
 
   const handleDelete = async () => {
     if (!modal?.session?.id) return
-    if (!confirm('¿Cancelar esta sesión?')) return
+    const ok = await confirm({
+      title: 'Cancelar esta sesión',
+      message: `${modal.session.nombre || 'Sesión'} · ${fmtDate(modal.session.fecha)}`,
+      confirmLabel: 'Cancelar sesión',
+      cancelLabel: 'No, mantener',
+      destructive: true,
+    })
+    if (!ok) return
     await updateSession(modal.session.id, { estatus: 'Cancelada' })
     toast('Sesión cancelada')
     setModal(null)
@@ -361,6 +371,7 @@ export default function Agenda({ sessions, createSession, updateSession, onSelec
           onSave={handleSave}
           onClose={() => setModal(null)}
           onDelete={handleDelete}
+          createPago={createPago}
           sessions={sessions}
         />
       )}

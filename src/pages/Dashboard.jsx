@@ -3,6 +3,7 @@ import { es } from 'date-fns/locale'
 import { todayStr, tomorrowStr } from '../lib/utils'
 import { useConfig } from '../hooks/useConfig'
 import { useIsMobile } from '../hooks/useIsMobile'
+import { useNowMinutes } from '../hooks/useNowMinutes'
 import DashboardMobile from './DashboardMobile'
 import DashboardDesktop from './DashboardDesktop'
 
@@ -14,8 +15,8 @@ export default function Dashboard(props) {
   const today    = todayStr()
   const tomorrow = tomorrowStr()
 
-  const effectiveStart = config.stats_start || today
-  const effectiveEnd   = config.stats_end   || format(addDays(new Date(), 29), 'yyyy-MM-dd')
+  const effectiveStart = config.stats_settings?.stats_start || today
+  const effectiveEnd   = config.stats_settings?.stats_end   || format(addDays(new Date(), 29), 'yyyy-MM-dd')
 
   const rangeLabel = (() => {
     try {
@@ -38,7 +39,7 @@ export default function Dashboard(props) {
     ['Completada', 'Entregada', 'Pendiente de entrega'].includes(s.estatus) &&
     (+s.restante === 0 || s.restante === '' || s.restante == null)
   )
-  const totalLiquidado = liquidadas.reduce((a, s) => a + (+s.pagos || 0), 0)
+  const totalLiquidado = liquidadas.reduce((a, s) => a + (+s.anticipo || 0) + (+s.pagos || 0), 0)
   const totalAnticipo  = rangeActive.reduce((a, s) => a + (+s.anticipo || 0), 0)
   const totalRestante  = rangeActive.reduce((a, s) => a + (+s.restante || 0), 0)
 
@@ -50,7 +51,7 @@ export default function Dashboard(props) {
     .sort((a, b) => a.hora > b.hora ? 1 : -1)
 
   // Featured session: in-session now, or next upcoming today
-  const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes()
+  const nowMinutes = useNowMinutes()
   const featuredSession = (() => {
     const candidates = sessions
       .filter(s => s.fecha === today && ['Reservada', 'Confirmada', 'Llegó', 'En sesión'].includes(s.estatus))

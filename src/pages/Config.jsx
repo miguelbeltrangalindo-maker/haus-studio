@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { format, addDays } from 'date-fns'
 import { useConfig } from '../hooks/useConfig'
 import { useToast } from '../hooks/useToast'
+import { supabase } from '../lib/supabase'
 
 const Toggle = ({ checked, onChange }) => (
   <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', flexShrink: 0 }}
@@ -47,7 +48,7 @@ const DIAS_SEMANA = [
 ]
 
 export default function Config({ comisionSchemaReady = false }) {
-  const { config, updateConfig } = useConfig()
+  const { config, updateConfig, statsSchemaReady } = useConfig()
   const toast = useToast()
   const [form, setForm] = useState(config)
   const [saving, setSaving] = useState(false)
@@ -55,7 +56,10 @@ export default function Config({ comisionSchemaReady = false }) {
   const [newPrecio, setNewPrecio]     = useState('')
   const [addingC, setAddingC]         = useState(false)
   const [editingPrices, setEditingPrices] = useState({})
-  const [newBlockedDate, setNewBlockedDate] = useState('') // { [id]: precio_string }
+  const [newBlockedDate, setNewBlockedDate] = useState('')
+  // ── Testing Reset ──
+  const [resetStep,  setResetStep]  = useState(0) // 0=hidden 1=warning 2=final
+  const [resetting,  setResetting]  = useState(false)
 
   useEffect(() => { setForm(config) }, [config])
 
@@ -110,6 +114,25 @@ export default function Config({ comisionSchemaReady = false }) {
     )
     if (!segunda) return
     set('extra_conceptos', conceptos.filter(c => c.id !== id))
+  }
+
+  const handleTestingReset = async () => {
+    setResetting(true)
+    const tables = ['session_pagos', 'session_extras', 'gastos', 'sessions']
+    const errors = []
+    for (const table of tables) {
+      const { error } = await supabase.from(table).delete().not('id', 'is', null)
+      if (error && error.code !== '42P01') errors.push(`${table}: ${error.message}`)
+    }
+    setResetting(false)
+    setResetStep(0)
+    if (errors.length) {
+      toast(`Errores: ${errors.join(' · ')}`, 'error')
+    } else {
+      toast('Sistema reiniciado — todos los datos eliminados', 'success')
+      // Force a full page reload so all hooks re-fetch empty state
+      setTimeout(() => window.location.reload(), 800)
+    }
   }
 
   const handleSave = async () => {
@@ -173,25 +196,38 @@ export default function Config({ comisionSchemaReady = false }) {
               <div className="form-group">
                 <label className="form-label">Fecha de inicio</label>
                 <input className="form-input" type="date"
-                  value={form.stats_start || defaultStart}
-                  onChange={e => set('stats_start', e.target.value)} />
+                  value={form.stats_settings?.stats_start || defaultStart}
+                  onChange={e => set('stats_settings', { ...(form.stats_settings || {}), stats_start: e.target.value })} />
               </div>
               <div className="form-group">
                 <label className="form-label">Fecha de fin</label>
                 <input className="form-input" type="date"
-                  value={form.stats_end || defaultEnd}
-                  min={form.stats_start || defaultStart}
-                  onChange={e => set('stats_end', e.target.value)} />
+                  value={form.stats_settings?.stats_end || defaultEnd}
+                  min={form.stats_settings?.stats_start || defaultStart}
+                  onChange={e => set('stats_settings', { ...(form.stats_settings || {}), stats_end: e.target.value })} />
               </div>
             </div>
-            {(form.stats_start || form.stats_end) && (
+            {(form.stats_settings?.stats_start || form.stats_settings?.stats_end) && (
               <button
                 className="btn btn-ghost btn-sm"
                 style={{ marginTop: 10 }}
-                onClick={() => { set('stats_start', ''); set('stats_end', '') }}
+                onClick={() => set('stats_settings', { stats_start: '', stats_end: '' })}
               >
                 Restablecer a 30 días desde hoy
               </button>
+            )}
+
+            {!statsSchemaReady && (
+              <div style={{
+                marginTop: 16,
+                background: 'var(--red-bg)', border: '1px solid rgba(156,53,53,.25)',
+                borderRadius: 'var(--r2)', padding: '14px 18px',
+              }}>
+                <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6, color: 'var(--red-l)' }}>
+                  Requiere migración — el rango no se guardará hasta ejecutar esto en Supabase:
+                </div>
+                <pre className="sql-block">{`ALTER TABLE config ADD COLUMN IF NOT EXISTS stats_settings jsonb DEFAULT '{}'::jsonb;`}</pre>
+              </div>
             )}
           </div>
 
@@ -494,6 +530,108 @@ ALTER TABLE config ADD COLUMN IF NOT EXISTS payment_settings jsonb DEFAULT '{"co
             <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
               {saving ? 'Guardando…' : 'Guardar todos los cambios'}
             </button>
+          </div>
+
+          {/* ── Testing Reset ── */}
+          <div className="config-section" style={{ marginTop: 40, borderColor: 'var(--red)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <div className="config-title" style={{ color: 'var(--red)', marginBottom: 0 }}>Testing Reset</div>
+              <span style={{
+                fontSize: 11, fontWeight: 700, letterSpacing: '.06em',
+                background: 'var(--red)', color: '#fff',
+                padding: '2px 8px', borderRadius: 99,
+              }}>SOLO PRUEBAS</span>
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.6, marginBottom: 16 }}>
+              Este botón <strong>borra permanentemente</strong> toda la información del sistema:{' '}
+              sesiones, clientes, cobros de saldo, cargos adicionales y gastos.
+              Úsalo únicamente durante la fase de pruebas para dejar la base de datos limpia.
+              <strong style={{ color: 'var(--red)' }}> Esta acción no se puede deshacer.</strong>
+            </div>
+
+            {resetStep === 0 && (
+              <button
+                className="btn btn-sm"
+                onClick={() => setResetStep(1)}
+                style={{ color: 'var(--red)', borderColor: 'var(--red)' }}
+              >
+                Testing Reset
+              </button>
+            )}
+
+            {resetStep === 1 && (
+              <div style={{
+                border: '1px solid var(--red)', borderRadius: 'var(--r2)',
+                overflow: 'hidden',
+              }}>
+                <div style={{ padding: '16px 18px' }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--red)', marginBottom: 10 }}>
+                    ⚠ Se eliminarán todos estos registros
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+                    {[
+                      ['Sesiones', 'Todos los agendamientos y datos de clientes'],
+                      ['Cobros de saldo', 'Historial completo de pagos (session_pagos)'],
+                      ['Cargos adicionales', 'Todos los extras aplicados a sesiones'],
+                      ['Gastos', 'Todos los gastos, incluyendo comisiones automáticas'],
+                    ].map(([title, desc]) => (
+                      <div key={title} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                        <span style={{ color: 'var(--red)', fontWeight: 700, flexShrink: 0 }}>×</span>
+                        <span style={{ fontSize: 13, color: 'var(--text2)' }}>
+                          <strong>{title}</strong> — {desc}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 14 }}>
+                    La configuración del estudio (mensajes, cargos, horarios, comisiones) <strong>no</strong> se borrará.
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      className="btn btn-sm"
+                      onClick={() => setResetStep(2)}
+                      style={{ color: 'var(--red)', borderColor: 'var(--red)' }}
+                    >
+                      Entiendo, continuar →
+                    </button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setResetStep(0)}>
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {resetStep === 2 && (
+              <div style={{
+                border: '1px solid var(--red)', borderRadius: 'var(--r2)',
+                overflow: 'hidden',
+                background: 'color-mix(in srgb, var(--red) 8%, transparent)',
+              }}>
+                <div style={{ padding: '16px 18px' }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--red)', marginBottom: 8 }}>
+                    Confirmación final — Esta acción NO puede deshacerse
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16, lineHeight: 1.6 }}>
+                    Se eliminarán de forma permanente <strong>todos los datos operativos</strong> del sistema.
+                    La base de datos quedará vacía y lista para una nueva fase de pruebas.
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      className="btn btn-sm btn-danger"
+                      onClick={handleTestingReset}
+                      disabled={resetting}
+                      style={{ flex: 1 }}
+                    >
+                      {resetting ? 'Eliminando todo…' : 'Ejecutar Testing Reset'}
+                    </button>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setResetStep(0)} disabled={resetting}>
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
         </div>

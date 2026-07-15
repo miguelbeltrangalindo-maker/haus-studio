@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { todayStr, fmtDate, initials, statusClass, nextStatus, nextStatusLabel } from '../lib/utils'
+import { SkeletonRows } from '../components/Skeleton'
 
 const QUICK_FLOW = [
   ['Confirmada',           'Confirmar'],
@@ -21,13 +22,17 @@ const getQuickActions = (estatus) => {
 }
 import { useConfig } from '../hooks/useConfig'
 import { useToast } from '../hooks/useToast'
+import { useConfirm } from '../components/ConfirmDialog'
 import Badge from '../components/Badge'
 import SessionModal from '../components/SessionModal'
+import QuickCobrarSheet from '../components/QuickCobrarSheet'
 
-export default function Hoy({ sessions, loading, createSession, updateSession }) {
+export default function Hoy({ sessions, loading, createSession, updateSession, createPago }) {
   const { config } = useConfig()
   const toast = useToast()
+  const confirm = useConfirm()
   const [modal, setModal] = useState(null)
+  const [cobrarSession, setCobrarSession] = useState(null)
   const [sendingWA, setSendingWA] = useState(new Set())
 
   const sendTemplate = async (s, e) => {
@@ -41,10 +46,10 @@ export default function Hoy({ sessions, loading, createSession, updateSession })
         body: JSON.stringify({ session_id: s.id }),
       })
       const data = await res.json()
-      if (data.sent)    { toast(`Plantilla enviada a ${s.nombre.split(' ')[0]}`, 'success') }
-      else if (data.skipped === 'already sent') { toast('Ya se había enviado', 'info') }
-      else              { toast('Error al enviar WA', 'error') }
-    } catch { toast('Error al enviar WA', 'error') }
+      if (data.sent)    { toast(`Plantilla enviada a ${(s.nombre || '').split(' ')[0]}`, 'success') }
+      else if (data.skipped === 'already sent') { toast('WhatsApp ya se había enviado', 'info') }
+      else              { toast('No se pudo enviar WhatsApp', 'error') }
+    } catch { toast('No se pudo enviar WhatsApp', 'error') }
     finally { setSendingWA(prev => { const n = new Set(prev); n.delete(s.id); return n }) }
   }
 
@@ -54,10 +59,12 @@ export default function Hoy({ sessions, loading, createSession, updateSession })
     .filter(s => s.fecha === today && s.estatus !== 'Cancelada')
     .sort((a, b) => (a.hora || '') > (b.hora || '') ? 1 : -1)
 
-  const completadas  = todaySessions.filter(s => ['Completada', 'Entregada', 'Pendiente de entrega'].includes(s.estatus)).length
-  const pendientes   = todaySessions.filter(s => ['Reservada', 'Confirmada', 'Llegó', 'En sesión'].includes(s.estatus)).length
-  const cobrado      = todaySessions.reduce((a, s) => a + (+s.anticipo || 0) + (+s.pagos || 0), 0)
-  const porCobrar    = todaySessions.reduce((a, s) => a + (+s.restante || 0), 0)
+  // "No show" se muestra en la lista pero no cuenta en las métricas del día
+  const todayActivas = todaySessions.filter(s => s.estatus !== 'No show')
+  const completadas  = todayActivas.filter(s => ['Completada', 'Entregada', 'Pendiente de entrega'].includes(s.estatus)).length
+  const pendientes   = todayActivas.filter(s => ['Reservada', 'Confirmada', 'Llegó', 'En sesión'].includes(s.estatus)).length
+  const cobrado      = todayActivas.reduce((a, s) => a + (+s.anticipo || 0) + (+s.pagos || 0), 0)
+  const porCobrar    = todayActivas.reduce((a, s) => a + (+s.restante || 0), 0)
 
   const dateLabel = format(new Date(), "EEEE, d 'de' MMMM yyyy", { locale: es })
 
@@ -91,14 +98,22 @@ export default function Hoy({ sessions, loading, createSession, updateSession })
     let result
     if (modal?.session?.id) result = await updateSession(modal.session.id, form)
     else result = await createSession(form)
-    if (result.error) { toast(result.error, 'error'); return }
+    if (result.error) { toast(result.error, 'error'); return result }
     toast(modal?.session?.id ? 'Sesión actualizada' : 'Sesión creada', 'success')
     setModal(null)
+    return result
   }
 
   const handleDelete = async () => {
     if (!modal?.session?.id) return
-    if (!confirm('¿Cancelar esta sesión?')) return
+    const ok = await confirm({
+      title: 'Cancelar esta sesión',
+      message: `${modal.session.nombre || 'Sesión'} · ${modal.session.hora?.slice(0, 5) || ''}`,
+      confirmLabel: 'Cancelar sesión',
+      cancelLabel: 'No, mantener',
+      destructive: true,
+    })
+    if (!ok) return
     await updateSession(modal.session.id, { estatus: 'Cancelada' })
     toast('Sesión cancelada')
     setModal(null)
@@ -163,7 +178,7 @@ export default function Hoy({ sessions, loading, createSession, updateSession })
       {/* Lista operativa */}
       <div className="hoy-list">
         {loading ? (
-          <div className="loading">Cargando…</div>
+          <SkeletonRows count={4} />
         ) : todaySessions.length === 0 ? (
           <div className="hoy-empty">
             <div className="hoy-empty-glyph">◯</div>
@@ -246,6 +261,17 @@ export default function Hoy({ sessions, loading, createSession, updateSession })
                       </button>
                     )}
 
+                    {/* Cobrar saldo en 1 paso */}
+                    {+s.restante > 0 && !['Cancelada', 'No show'].includes(s.estatus) && (
+                      <button
+                        className="btn btn-primary btn-sm"
+                        onClick={() => setCobrarSession(s)}
+                        title="Cobrar saldo"
+                      >
+                        Cobrar ${(+s.restante).toLocaleString()}
+                      </button>
+                    )}
+
                     <button
                       className="btn btn-ghost btn-sm"
                       onClick={() => setModal({ session: s })}
@@ -271,7 +297,17 @@ export default function Hoy({ sessions, loading, createSession, updateSession })
           onSave={handleSave}
           onClose={() => setModal(null)}
           onDelete={handleDelete}
+          createPago={createPago}
           sessions={sessions}
+        />
+      )}
+
+      {cobrarSession && (
+        <QuickCobrarSheet
+          session={cobrarSession}
+          onClose={() => setCobrarSession(null)}
+          updateSession={updateSession}
+          createPago={createPago}
         />
       )}
     </>

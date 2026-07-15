@@ -2,10 +2,11 @@ import { useState, useMemo } from 'react'
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, format } from 'date-fns'
 import { todayStr, tomorrowStr, initials, fmtDate, ALL_STATUSES } from '../lib/utils'
 import { useToast } from '../hooks/useToast'
+import { useConfirm } from '../components/ConfirmDialog'
 import Badge from '../components/Badge'
 import SessionModal from '../components/SessionModal'
+import { SkeletonRows, EmptyState } from '../components/Skeleton'
 import { useConfig } from '../hooks/useConfig'
-import { exportSesiones } from '../lib/exportExcel'
 
 const QUICK = [
   { label: 'Todas',            key: '' },
@@ -21,8 +22,9 @@ const QUICK = [
   { label: 'Rango',            key: 'rango' },
 ]
 
-export default function Sesiones({ sessions, loading, createSession, updateSession, onSelectSession }) {
+export default function Sesiones({ sessions, loading, createSession, updateSession, createPago, onSelectSession }) {
   const toast = useToast()
+  const confirm = useConfirm()
   const { config } = useConfig()
   const [search, setSearch] = useState('')
   const [quick,  setQuick]  = useState('')
@@ -91,14 +93,22 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
     let result
     if (modal?.session?.id) result = await updateSession(modal.session.id, form)
     else result = await createSession(form)
-    if (result.error) { toast(result.error, 'error'); return }
+    if (result.error) { toast(result.error, 'error'); return result }
     toast(modal?.session?.id ? 'Sesión actualizada' : 'Sesión creada', 'success')
     setModal(null)
+    return result
   }
 
   const handleDelete = async () => {
     if (!modal?.session?.id) return
-    if (!confirm('¿Cancelar esta sesión?')) return
+    const ok = await confirm({
+      title: 'Cancelar esta sesión',
+      message: `${modal.session.nombre || 'Sesión'} · ${fmtDate(modal.session.fecha)}`,
+      confirmLabel: 'Cancelar sesión',
+      cancelLabel: 'No, mantener',
+      destructive: true,
+    })
+    if (!ok) return
     await updateSession(modal.session.id, { estatus: 'Cancelada' })
     toast('Sesión cancelada')
     setModal(null)
@@ -132,7 +142,7 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
           <button className="btn btn-ghost btn-sm" onClick={exportCSV} title="Exportar CSV">
             ↓ CSV
           </button>
-          <button className="btn btn-ghost btn-sm" onClick={() => exportSesiones(filtered)} title="Exportar Excel"
+          <button className="btn btn-ghost btn-sm" onClick={async () => (await import('../lib/exportExcel')).exportSesiones(filtered)} title="Exportar Excel"
             disabled={filtered.length === 0}>
             ↓ Excel
           </button>
@@ -191,19 +201,35 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
 
         <div className="card" style={{ padding: 0 }}>
           {loading ? (
-            <div className="loading">Cargando sesiones…</div>
+            <SkeletonRows count={5} />
           ) : filtered.length === 0 ? (
-            <div className="empty-state">Sin sesiones que coincidan</div>
+            sessions.length === 0 ? (
+              <EmptyState
+                glyph="◯"
+                title="Aún no hay sesiones"
+                sub="Crea la primera para empezar a llenar tu agenda."
+                action={
+                  <button className="btn btn-primary btn-sm" onClick={() => setModal({})}>
+                    + Agendar primera sesión
+                  </button>
+                }
+              />
+            ) : (
+              <EmptyState
+                glyph="—"
+                title="Sin coincidencias"
+                sub="Ninguna sesión cumple con los filtros actuales."
+                action={
+                  <button className="btn btn-sm" onClick={() => { setSearch(''); setQuick(''); setRangeFrom(''); setRangeTo('') }}>
+                    Limpiar filtros
+                  </button>
+                }
+              />
+            )
           ) : (
             <div className="session-list">
               {filtered.map(s => (
-                <div key={s.id} className="session-card" onClick={() => {
-                    if (window.matchMedia('(min-width: 769px)').matches) {
-                      onSelectSession?.(s)
-                    } else {
-                      setModal({ session: s })
-                    }
-                  }}>
+                <div key={s.id} className="session-card" onClick={() => onSelectSession?.(s)}>
                   <div className="session-card-left">
                     <div className="avatar">{initials(s.nombre)}</div>
                     <div className="session-card-info">
@@ -267,6 +293,7 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
           onSave={handleSave}
           onClose={() => setModal(null)}
           onDelete={handleDelete}
+          createPago={createPago}
           sessions={sessions}
         />
       )}
