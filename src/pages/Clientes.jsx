@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { fmtDate, initials, esCortesia, ingresoAnticipo } from '../lib/utils'
+import { fmtDate, initials, esCortesia, ingresoAnticipo, fmtFechaHora } from '../lib/utils'
 import Badge from '../components/Badge'
 import { SkeletonRows, EmptyState } from '../components/Skeleton'
 
@@ -26,8 +26,8 @@ export default function Clientes({ sessions = [], loading, onSelectSession }) {
 
     return Object.values(map).map(c => {
       const activas = c.sesiones.filter(s => !['Cancelada', 'No show'].includes(s.estatus))
-      const sorted  = [...c.sesiones].sort((a, b) => b.fecha > a.fecha ? 1 : -1)
-      const latest  = sorted[0]
+      const sorted  = [...c.sesiones].sort((a, b) => (b.fecha || '9999') > (a.fecha || '9999') ? 1 : -1)
+      const latest  = sorted.find(s => s.fecha) || sorted[0]
       const totalGastado = activas.reduce((a, s) => a + ingresoAnticipo(s) + (+s.pagos || 0), 0)
       const saldoPendiente = activas.reduce((a, s) => a + (+s.restante || 0), 0)
       return {
@@ -202,7 +202,7 @@ export default function Clientes({ sessions = [], loading, onSelectSession }) {
                       >
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text1)' }}>
-                            {fmtDate(s.fecha)} · {s.hora?.slice(0, 5)}
+                            {fmtFechaHora(s)}
                           </div>
                           <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>
                             {s.personas} {s.personas === 1 ? 'persona' : 'personas'}

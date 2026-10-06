@@ -14,7 +14,7 @@ export default function DashboardMobile({
   sessions, loading, createSession,
   rangeLabel, totalSessions,
   confirmadas, pendEntrega, pendPago, entregadas, canceladas, liquidadas,
-  totalLiquidado, totalAnticipo, totalRestante,
+  sinFechaSes = [], sinFechaAnticipo = 0, totalLiquidado, totalAnticipo, totalRestante,
   todaySes, tomorrowSes, featuredSession,
 }) {
   const toast    = useToast()
@@ -278,6 +278,23 @@ export default function DashboardMobile({
             <div className="dash-kpi-label">Entregadas</div>
           </div>
         </div>
+
+        {sinFechaSes.length > 0 && (
+          <div className="dash-kpi" onClick={() => navigate('/sesiones?f=sin-fecha')} style={{ cursor: 'pointer' }}>
+            <KpiIcon color="violet">
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <rect x="1.5" y="2.5" width="13" height="12" rx="1.5" strokeDasharray="2.5 2"/>
+                <path d="M5 1.5v2M11 1.5v2M6.5 9.5h3"/>
+              </svg>
+            </KpiIcon>
+            <div>
+              <div className="dash-kpi-value" style={{ color: 'var(--violet-l)' }}>{sinFechaSes.length}</div>
+              <div className="dash-kpi-label">
+                Sin fecha{sinFechaAnticipo > 0 ? ` · $${sinFechaAnticipo.toLocaleString()}` : ''}
+              </div>
+            </div>
+          </div>
+        )}
 
         {canceladas.length > 0 && (
           <div className="dash-kpi" onClick={() => navigate('/sesiones?f=cancelada')} style={{ cursor: 'pointer' }}>

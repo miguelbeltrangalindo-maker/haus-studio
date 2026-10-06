@@ -10,7 +10,7 @@ const ANTICIPO_METHODS = [
   { key: 'cupon',         label: 'Cortesía' },
 ]
 
-export default function SessionModal({ session, prefillDate, prefillHora, onSave, onClose, onDelete, sessions = [] }) {
+export default function SessionModal({ session, startSinFecha = false, prefillDate, prefillHora, onSave, onClose, onDelete, sessions = [] }) {
   const { config } = useConfig()
   const toast = useToast()
   const isNew = !session?.id
@@ -37,10 +37,13 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
     link_sent: false,
   })
   const [saving, setSaving] = useState(false)
+  // Apartado: el cliente dejó anticipo pero aún no elige día. fecha/hora se guardan en null.
+  const [sinFecha, setSinFecha] = useState(session?.id ? !session.fecha : startSinFecha)
 
   // Solo al abrir otra sesión: si el registro cambia mientras se edita, no se pisan los cambios del usuario
   useEffect(() => {
-    if (session) setForm(f => ({ ...f, ...session, hora: session.hora?.slice(0, 5) || f.hora }))
+    if (session) setForm(f => ({ ...f, ...session, fecha: session.fecha || f.fecha, hora: session.hora?.slice(0, 5) || f.hora }))
+    if (session?.id) setSinFecha(!session.fecha)
   }, [session?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
@@ -83,12 +86,12 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
     if (!form.nombre.trim()) { toast('El nombre es requerido', 'error'); return }
     const digits = form.telefono.replace(/\D/g, '')
     if (digits.length !== 10) { toast('El teléfono debe tener exactamente 10 dígitos', 'error'); return }
-    if (!form.fecha) { toast('La fecha es requerida', 'error'); return }
-    if (!form.hora)  { toast('La hora es requerida', 'error'); return }
-    const hora = form.hora.slice(0, 5)
+    if (!sinFecha && !form.fecha) { toast('La fecha es requerida', 'error'); return }
+    if (!sinFecha && !form.hora)  { toast('La hora es requerida', 'error'); return }
+    const hora = sinFecha ? null : form.hora.slice(0, 5)
     // Reglas de horario solo aplican al agendar o reagendar: una sesión existente
     // no debe quedar bloqueada si después cambió el horario o se bloqueó su fecha.
-    const reagenda = isNew || form.fecha !== session?.fecha || hora !== session?.hora?.slice(0, 5)
+    const reagenda = !sinFecha && (isNew || form.fecha !== session?.fecha || hora !== session?.hora?.slice(0, 5))
     const openTime  = (config.open_time  || '00:00').slice(0, 5)
     const closeTime = (config.close_time || '23:59').slice(0, 5)
     if (reagenda && hora < openTime)   { toast(`La hora no puede ser antes de la apertura (${openTime})`, 'error'); return }
@@ -101,7 +104,7 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
         toast('No puedes agendar sesiones en el pasado', 'error'); return
       }
     }
-    const dayOfWeek = new Date(form.fecha + 'T12:00:00').getDay()
+    const dayOfWeek = sinFecha ? -1 : new Date(form.fecha + 'T12:00:00').getDay()
     const closedWeekdays = config.closed_weekdays || []
     const blockedDates   = config.blocked_dates   || []
     const DIAS = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado']
@@ -123,6 +126,7 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
     const toNum = v => (v === '' || v == null) ? null : +v
     const payload = {
       ...form,
+      fecha: sinFecha ? null : form.fecha,
       hora,
       nombre:    form.nombre.trim(),
       anticipo:  toNum(form.anticipo),
@@ -130,6 +134,8 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
       descuento: toNum(form.descuento),
       pagos:     toNum(form.pagos),
     }
+    if (isNew && sinFecha) payload.apartado = true
+    else delete payload.apartado // nunca se desmarca: conserva el origen para la tasa de conversión
     // Si el descuento cambió, el saldo por cobrar se ajusta por la diferencia
     if (descDelta !== 0) {
       payload.restante = Math.max(0, (+form.restante || 0) - descDelta)
@@ -147,7 +153,7 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
       <div className="modal" onClick={e => e.stopPropagation()}>
 
         {/* Header */}
-        <div className="modal-title">{isNew ? 'Nueva sesión' : form.nombre || 'Sesión'}</div>
+        <div className="modal-title">{isNew ? (sinFecha ? 'Nuevo apartado' : 'Nueva sesión') : form.nombre || 'Sesión'}</div>
         {!isNew && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
             <Badge status={form.estatus} />
@@ -202,17 +208,38 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
 
         {/* Sesión */}
         <div className="modal-section-title">Sesión</div>
+        <div className="method-tabs" role="radiogroup" aria-label="Fecha de la sesión" style={{ marginBottom: 14 }}>
+          <button type="button" role="radio" aria-checked={!sinFecha}
+            className={`method-tab ${!sinFecha ? 'active' : ''}`} onClick={() => setSinFecha(false)}>
+            Con fecha
+          </button>
+          <button type="button" role="radio" aria-checked={sinFecha}
+            className={`method-tab ${sinFecha ? 'active' : ''}`} onClick={() => setSinFecha(true)}>
+            Apartado sin fecha
+          </button>
+        </div>
+        {sinFecha && (
+          <div className="apartado-hint">
+            {isNew
+              ? 'El anticipo queda registrado y la sesión aparece en “Sin fecha” hasta que el cliente elija día.'
+              : 'Esta sesión no ocupa horario. Elige “Con fecha” cuando el cliente decida su día.'}
+          </div>
+        )}
         <div className="form-grid">
-          <div className="form-group">
-            <label className="form-label">Fecha *</label>
-            <input className="form-input" type="date" value={form.fecha}
-              onChange={e => set('fecha', e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Hora *</label>
-            <input className="form-input" type="time" value={form.hora}
-              onChange={e => set('hora', e.target.value)} step="1800" />
-          </div>
+          {!sinFecha && (
+            <>
+              <div className="form-group">
+                <label className="form-label">Fecha *</label>
+                <input className="form-input" type="date" value={form.fecha}
+                  onChange={e => set('fecha', e.target.value)} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Hora *</label>
+                <input className="form-input" type="time" value={form.hora}
+                  onChange={e => set('hora', e.target.value)} step="1800" />
+              </div>
+            </>
+          )}
           <div className="form-group">
             <label className="form-label">
               Personas {form.personas > 4 && <span style={{ color: 'var(--amber-l)', fontSize: 11 }}>+{form.personas - 4} cargo extra</span>}
@@ -356,7 +383,12 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
           )}
           <button className="btn btn-ghost" onClick={onClose}>Cerrar</button>
           <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? 'Guardando…' : isNew ? 'Agendar sesión' : 'Guardar cambios'}
+            {saving ? 'Guardando…'
+              : isNew ? (sinFecha
+                  ? (+form.anticipo > 0 && form.metodo_anticipo !== 'cupon' ? `Apartar con $${(+form.anticipo).toLocaleString()}` : 'Apartar sin fecha')
+                  : 'Agendar sesión')
+              : !session?.fecha && !sinFecha ? 'Agendar sesión'
+              : 'Guardar cambios'}
           </button>
         </div>
       </div>

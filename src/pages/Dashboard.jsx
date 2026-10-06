@@ -1,6 +1,6 @@
 import { format, addDays, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { todayStr, tomorrowStr, ingresoAnticipo } from '../lib/utils'
+import { todayStr, tomorrowStr, ingresoAnticipo, apartadoPendiente } from '../lib/utils'
 import { useConfig } from '../hooks/useConfig'
 import { useIsMobile } from '../hooks/useIsMobile'
 import { useNowMinutes } from '../hooks/useNowMinutes'
@@ -43,6 +43,10 @@ export default function Dashboard(props) {
   const totalAnticipo  = rangeActive.reduce((a, s) => a + ingresoAnticipo(s), 0)
   const totalRestante  = rangeActive.reduce((a, s) => a + (+s.restante || 0), 0)
 
+  // Apartados sin fecha: foto actual, no dependen del período
+  const sinFechaSes      = sessions.filter(apartadoPendiente)
+  const sinFechaAnticipo = sinFechaSes.reduce((a, s) => a + ingresoAnticipo(s), 0)
+
   const todaySes    = sessions
     .filter(s => s.fecha === today && !['Cancelada', 'No show'].includes(s.estatus))
     .sort((a, b) => a.hora > b.hora ? 1 : -1)
@@ -69,6 +73,7 @@ export default function Dashboard(props) {
     confirmadas, pendEntrega, pendPago,
     entregadas, canceladas, liquidadas,
     totalLiquidado, totalAnticipo, totalRestante,
+    sinFechaSes, sinFechaAnticipo,
     todaySes, tomorrowSes, featuredSession,
   }
 

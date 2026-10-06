@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, format } from 'date-fns'
-import { esCortesia, todayStr, tomorrowStr, initials, fmtDate, ALL_STATUSES } from '../lib/utils'
+import { esCortesia, todayStr, tomorrowStr, initials, fmtDate, ALL_STATUSES, sinFecha, apartadoPendiente, diasEsperando, mensajeApartado } from '../lib/utils'
 import { useToast } from '../hooks/useToast'
 import { useConfirm } from '../components/ConfirmDialog'
 import Badge from '../components/Badge'
@@ -13,6 +13,7 @@ const QUICK = [
   { label: 'Todas',            key: '' },
   { label: 'Hoy',              key: 'hoy' },
   { label: 'Mañana',           key: 'manana' },
+  { label: 'Sin fecha',        key: 'sin-fecha' },
   { label: 'Esta semana',      key: 'semana' },
   { label: 'Este mes',         key: 'mes' },
   { label: 'En sesión',        key: 'en-sesion' },
@@ -54,6 +55,7 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
     }
     if (quick === 'hoy')       list = list.filter(s => s.fecha === today)
     if (quick === 'manana')    list = list.filter(s => s.fecha === tomorrowStr())
+    if (quick === 'sin-fecha') list = list.filter(apartadoPendiente)
     if (quick === 'semana')    list = list.filter(s => s.fecha >= weekStart && s.fecha <= weekEnd)
     if (quick === 'mes')       list = list.filter(s => s.fecha >= monthStart && s.fecha <= monthEnd)
     if (quick === 'en-sesion') list = list.filter(s => s.estatus === 'En sesión')
@@ -65,15 +67,24 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
       if (rangeFrom) list = list.filter(s => s.fecha >= rangeFrom)
       if (rangeTo)   list = list.filter(s => s.fecha <= rangeTo)
     }
-    return list.sort((a, b) => (a.fecha + (a.hora || '')) < (b.fecha + (b.hora || '')) ? 1 : -1)
+    // Apartados sin fecha arriba (los más antiguos primero: son los que urge seguir); luego por fecha desc
+    return list.sort((a, b) => {
+      if (sinFecha(a) || sinFecha(b)) {
+        if (sinFecha(a) && sinFecha(b)) return (a.created_at || '') > (b.created_at || '') ? 1 : -1
+        return sinFecha(a) ? -1 : 1
+      }
+      return (a.fecha + (a.hora || '')) < (b.fecha + (b.hora || '')) ? 1 : -1
+    })
   }, [sessions, search, quick, rangeFrom, rangeTo, today, weekStart, weekEnd, monthStart, monthEnd])
+
+  const pendientesSinFecha = useMemo(() => sessions.filter(apartadoPendiente).length, [sessions])
 
   const exportCSV = () => {
     const headers = ['Nombre','Teléfono','Fecha','Hora','Personas','Estatus','Anticipo','Método anticipo','Pagos cobrados','Saldo pendiente','Descuento','Notas']
     const rows = filtered.map(s => [
       s.nombre || '',
       s.telefono || '',
-      s.fecha || '',
+      s.fecha || 'Sin fecha',
       s.hora?.slice(0, 5) || '',
       s.personas || '',
       s.estatus || '',
@@ -99,7 +110,7 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
     if (modal?.session?.id) result = await updateSession(modal.session.id, form)
     else result = await createSession(form)
     if (result.error) { toast(result.error, 'error'); return result }
-    toast(modal?.session?.id ? 'Sesión actualizada' : 'Sesión creada', 'success')
+    toast(modal?.session?.id ? 'Sesión actualizada' : form.fecha ? 'Sesión creada' : 'Apartado registrado — aparece en “Sin fecha”', 'success')
     setModal(null)
     return result
   }
@@ -108,7 +119,7 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
     if (!modal?.session?.id) return
     const ok = await confirm({
       title: 'Cancelar esta sesión',
-      message: `${modal.session.nombre || 'Sesión'} · ${fmtDate(modal.session.fecha)}`,
+      message: `${modal.session.nombre || 'Sesión'} · ${sinFecha(modal.session) ? 'Sin fecha' : fmtDate(modal.session.fecha)}`,
       confirmLabel: 'Cancelar sesión',
       cancelLabel: 'No, mantener',
       destructive: true,
@@ -123,7 +134,9 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
     e.stopPropagation()
     const phone = '52' + s.telefono.replace(/\D/g, '').replace(/^52/, '')
     let msg = ''
-    if (type === 'reminder') {
+    if (type === 'apartado') {
+      msg = mensajeApartado(s, config.studio_name || 'HAUS')
+    } else if (type === 'reminder') {
       msg = (config.reminder_message || '')
         .replace(/{nombre}/g, s.nombre)
         .replace(/{fecha}/g, fmtDate(s.fecha))
@@ -156,7 +169,9 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
             disabled={filtered.length === 0}>
             ↓ Excel
           </button>
-          <button className="btn btn-primary btn-sm" onClick={() => setModal({})}>+ Nueva sesión</button>
+          <button className="btn btn-primary btn-sm" onClick={() => setModal({ sinFecha: quick === 'sin-fecha' })}>
+            {quick === 'sin-fecha' ? '+ Nuevo apartado' : '+ Nueva sesión'}
+          </button>
         </div>
       </div>
 
@@ -186,6 +201,9 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
               onClick={() => setQuick(q.key)}
             >
               {q.label}
+              {q.key === 'sin-fecha' && pendientesSinFecha > 0 && (
+                <span style={{ marginLeft: 6, opacity: .7, fontVariantNumeric: 'tabular-nums' }}>{pendientesSinFecha}</span>
+              )}
             </button>
           ))}
         </div>
@@ -248,7 +266,13 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
                         <Badge status={s.estatus} />
                       </div>
                       <div className="session-card-meta">
-                        {fmtDate(s.fecha)} · {s.hora?.slice(0, 5)} · {s.personas} {s.personas === 1 ? 'persona' : 'personas'}
+                        {sinFecha(s) ? (
+                          <>
+                            <span className="tag-sin-fecha">Sin fecha</span>
+                            {' '}{(() => { const d = diasEsperando(s); return d === 0 ? 'apartado hoy' : `hace ${d} día${d !== 1 ? 's' : ''}` })()}
+                          </>
+                        ) : <>{fmtDate(s.fecha)} · {s.hora?.slice(0, 5)}</>}
+                        {' · '}{s.personas} {s.personas === 1 ? 'persona' : 'personas'}
                       </div>
                       {((+s.anticipo > 0) || (+s.restante > 0) || (+s.pagos > 0)) && (
                         <div className="session-card-money">
@@ -282,13 +306,23 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
                         💰
                       </button>
                     )}
-                    <button
-                      className="btn btn-wa btn-xs btn-icon"
-                      title="Recordatorio WhatsApp"
-                      onClick={e => openWA(s, 'reminder', e)}
-                    >
-                      📱
-                    </button>
+                    {sinFecha(s) ? (
+                      <button
+                        className="btn btn-wa btn-xs btn-icon"
+                        title="Pedir fecha por WhatsApp"
+                        onClick={e => openWA(s, 'apartado', e)}
+                      >
+                        📅
+                      </button>
+                    ) : (
+                      <button
+                        className="btn btn-wa btn-xs btn-icon"
+                        title="Recordatorio WhatsApp"
+                        onClick={e => openWA(s, 'reminder', e)}
+                      >
+                        📱
+                      </button>
+                    )}
                     {s.link && (
                       <button
                         className="btn btn-wa btn-xs btn-icon"
@@ -309,6 +343,7 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
       {modal !== null && (
         <SessionModal
           session={modal.session}
+          startSinFecha={modal.sinFecha}
           onSave={handleSave}
           onClose={() => setModal(null)}
           onDelete={handleDelete}

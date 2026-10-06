@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { fmtDate, initials } from '../lib/utils'
+import { initials, fmtFechaHora } from '../lib/utils'
 import Badge from './Badge'
 
 export default function GlobalSearch({ sessions = [], onSelect, onClose }) {
@@ -22,7 +22,7 @@ export default function GlobalSearch({ sessions = [], onSelect, onClose }) {
         s.nombre?.toLowerCase().includes(query) ||
         (digits.length >= 3 && s.telefono?.includes(digits))
       )
-      .sort((a, b) => (a.fecha + (a.hora || '')) < (b.fecha + (b.hora || '')) ? 1 : -1)
+      .sort((a, b) => ((a.fecha || '9999') + (a.hora || '')) < ((b.fecha || '9999') + (b.hora || '')) ? 1 : -1)
       .slice(0, 10)
   }, [sessions, q])
 
@@ -48,7 +48,7 @@ export default function GlobalSearch({ sessions = [], onSelect, onClose }) {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="gs-result-name">{s.nombre}</div>
                   <div className="gs-result-meta">
-                    {fmtDate(s.fecha)} · {s.hora?.slice(0, 5)}
+                    {fmtFechaHora(s)}
                     {+s.restante > 0 && (
                       <span style={{ color: 'var(--amber)' }}>
                         {` · $${(+s.restante).toLocaleString()} saldo`}

@@ -27,6 +27,7 @@ export default async function handler(req, res) {
 
   if (error || !session) return res.status(404).json({ error: 'Session not found' })
   if (!session.telefono)  return res.status(200).json({ skipped: 'no phone' })
+  if (!session.fecha)     return res.status(200).json({ skipped: 'sin fecha' })
   if (session[flag]) return res.status(200).json({ skipped: 'already sent' })
   if (['Cancelada', 'No show'].includes(session.estatus)) {
     return res.status(200).json({ skipped: 'cancelled' })

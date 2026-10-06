@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { esCortesia, ingresoAnticipo } from './utils'
+import { esCortesia, ingresoAnticipo, resumenApartados, diasEsperando } from './utils'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 const today = () => format(new Date(), 'yyyy-MM-dd')
@@ -53,7 +53,7 @@ export function exportSesiones(sessions) {
     return [
       s.nombre        || '',
       s.telefono      || '',
-      fmtFecha(s.fecha),
+      s.fecha ? fmtFecha(s.fecha) : 'Sin fecha',
       s.hora?.slice(0, 5) || '',
       s.personas      || '',
       s.ninos         || 0,
@@ -103,8 +103,8 @@ export function exportClientes(sessions) {
 
   const clientes = Object.values(map).map(c => {
     const activas  = c.sesiones.filter(s => !['Cancelada', 'No show'].includes(s.estatus))
-    const sorted   = [...c.sesiones].sort((a, b) => b.fecha > a.fecha ? 1 : -1)
-    const latest   = sorted[0]
+    const sorted   = [...c.sesiones].sort((a, b) => (b.fecha || '9999') > (a.fecha || '9999') ? 1 : -1)
+    const latest   = sorted.find(s => s.fecha) || sorted[0]
     const totalGastado   = activas.reduce((a, s) => a + ingresoAnticipo(s) + (+s.pagos || 0), 0)
     const saldoPendiente = activas.reduce((a, s) => a + (+s.restante  || 0), 0)
     return {
@@ -151,7 +151,7 @@ export function exportClientes(sessions) {
       .filter(s => s.telefono?.replace(/\D/g, '').slice(-10) === c.telefono?.replace(/\D/g, '').slice(-10))
       .sort((a, b) => b.fecha > a.fecha ? 1 : -1)
     clientSessions.forEach(s => rows2.push([
-      c.nombre, c.telefono, fmtFecha(s.fecha), s.hora?.slice(0, 5) || '',
+      c.nombre, c.telefono, s.fecha ? fmtFecha(s.fecha) : 'Sin fecha', s.hora?.slice(0, 5) || '',
       s.personas, s.estatus, ingresoAnticipo(s), +s.pagos || 0, +s.restante || 0,
     ]))
   })
@@ -425,6 +425,35 @@ export function exportEstadisticas({ sessions, gastos, pagos, extras, rangeStart
   }
   autoWidth(wsExtras)
 
+  // ── Sheet 7: Apartados sin fecha (foto actual, no depende del período) ──
+  const ap = resumenApartados(sessions)
+  const wsApartados = XLSX.utils.aoa_to_sheet([
+    ['Cliente', 'Teléfono', 'Apartado el', 'Días esperando', 'Anticipo', 'Método', 'Por cobrar', 'Notas'],
+    ...ap.pendientes.map(s => [
+      s.nombre, s.telefono,
+      s.created_at ? fmtFecha(format(new Date(s.created_at), 'yyyy-MM-dd')) : '',
+      diasEsperando(s),
+      ingresoAnticipo(s),
+      esCortesia(s) ? 'Cortesía' : (s.metodo_anticipo || ''),
+      +s.restante || 0,
+      (s.notas || '').replace(/\n/g, ' '),
+    ]),
+    ['TOTAL', '', '', '', ap.anticipoRetenido, '', ap.porCobrar, ''],
+    [],
+    ['Apartados históricos', ap.totalHistorico],
+    ['Ya agendaron', ap.agendados],
+    ['Cancelados / no show', ap.perdidos],
+    ['Tasa de agendado', ap.tasaAgendado == null ? '—' : `${ap.tasaAgendado}%`],
+  ])
+  const range7 = XLSX.utils.decode_range(wsApartados['!ref'])
+  for (let R = 1; R <= ap.pendientes.length + 1 && R <= range7.e.r; ++R) {
+    [4, 6].forEach(C => {
+      const addr = XLSX.utils.encode_cell({ r: R, c: C })
+      if (wsApartados[addr]) wsApartados[addr].z = '"$"#,##0.00'
+    })
+  }
+  autoWidth(wsApartados)
+
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, wsResumen,  'Resumen')
   XLSX.utils.book_append_sheet(wb, wsEstatus,  'Por estatus')
@@ -432,5 +461,6 @@ export function exportEstadisticas({ sessions, gastos, pagos, extras, rangeStart
   XLSX.utils.book_append_sheet(wb, wsMetodos,  'Cobros por método')
   XLSX.utils.book_append_sheet(wb, wsDeudores, 'Deudores')
   XLSX.utils.book_append_sheet(wb, wsExtras,   'Cargos extras')
+  XLSX.utils.book_append_sheet(wb, wsApartados, 'Apartados sin fecha')
   download(wb, 'estadisticas')
 }

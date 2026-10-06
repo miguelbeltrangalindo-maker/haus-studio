@@ -27,7 +27,7 @@ export function useSessions() {
   // Columns added after initial deploy — require ALTER TABLE in Supabase.
   // If the DB doesn't have them yet, we strip & retry so the app doesn't crash.
   // pagos = running total of balance payments collected (not counting anticipo)
-  const OPTIONAL_COLS = ['metodo_pago', 'pagos', 'metodo_anticipo', 'descuento', 'ninos']
+  const OPTIONAL_COLS = ['metodo_pago', 'pagos', 'metodo_anticipo', 'descuento', 'ninos', 'apartado']
   const stripOptional = (obj) => {
     const out = { ...obj }
     OPTIONAL_COLS.forEach(c => delete out[c])
@@ -35,24 +35,31 @@ export function useSessions() {
   }
   const isSchemaError = (msg = '') =>
     msg.includes('schema cache') || msg.includes('column') || msg.includes('does not exist')
+  // fecha/hora aún NOT NULL en la base: falta correr alter_sessions_apartados_sin_fecha.sql
+  const friendlyError = (msg = '') =>
+    msg.includes('null value') && (msg.includes('"fecha"') || msg.includes('"hora"'))
+      ? 'Para guardar apartados sin fecha falta correr la migración alter_sessions_apartados_sin_fecha.sql en Supabase'
+      : msg
 
   const createSession = async (data) => {
-    // Check conflict
-    const { data: conflict } = await supabase
-      .from('sessions')
-      .select('id, nombre')
-      .eq('fecha', data.fecha)
-      .eq('hora', data.hora)
-      .neq('estatus', 'Cancelada')
-      .maybeSingle()
-    if (conflict) return { error: `Ese horario ya está reservado para ${conflict.nombre}` }
+    // Check conflict (un apartado sin fecha no ocupa horario)
+    if (data.fecha && data.hora) {
+      const { data: conflict } = await supabase
+        .from('sessions')
+        .select('id, nombre')
+        .eq('fecha', data.fecha)
+        .eq('hora', data.hora)
+        .neq('estatus', 'Cancelada')
+        .maybeSingle()
+      if (conflict) return { error: `Ese horario ya está reservado para ${conflict.nombre}` }
+    }
 
     let payload = { ...data, created_at: new Date().toISOString() }
     let { data: row, error } = await supabase.from('sessions').insert([payload]).select().single()
     if (error && isSchemaError(error.message)) {
       ;({ data: row, error } = await supabase.from('sessions').insert([stripOptional(payload)]).select().single())
     }
-    if (error) return { error: error.message }
+    if (error) return { error: friendlyError(error.message) }
     setSessions(prev => [row, ...prev])
     return { data: row }
   }
@@ -63,7 +70,7 @@ export function useSessions() {
       const current = sessions.find(s => s.id === id)
       const checkFecha = updates.fecha || current?.fecha
       const checkHora  = updates.hora  || current?.hora
-      const { data: conflict } = await supabase
+      const { data: conflict } = !(checkFecha && checkHora) ? {} : await supabase
         .from('sessions')
         .select('id, nombre')
         .eq('fecha', checkFecha)
@@ -78,7 +85,7 @@ export function useSessions() {
     if (error && isSchemaError(error.message)) {
       ;({ data: row, error } = await supabase.from('sessions').update(stripOptional(updates)).eq('id', id).select().single())
     }
-    if (error) return { error: error.message }
+    if (error) return { error: friendlyError(error.message) }
     setSessions(prev => prev.map(s => s.id === id ? row : s))
     return { data: row }
   }

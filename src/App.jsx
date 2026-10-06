@@ -182,7 +182,14 @@ function AppInner() {
       if (cr?.error) toast('La comisión bancaria no se registró — agrégala manualmente en Gastos', 'error')
     }
 
-    // Send booking confirmation via WA if configured
+    // Un apartado sin fecha no tiene día que confirmar: se envía cuando se agende
+    if (session.fecha) await sendBookingConfirmation(session)
+
+    return result
+  }
+
+  // Confirmación de reserva por WhatsApp (si está activada en Config)
+  const sendBookingConfirmation = async (session) => {
     if (config.wa_settings?.on_booking && session?.id) {
       try {
         const waRes  = await window.fetch('/api/send-confirmation', {
@@ -198,8 +205,6 @@ function AppInner() {
         else if (!session.telefono)   toast('Sin teléfono — WhatsApp no enviado', 'info')
       } catch { toast('WhatsApp: sin conexión', 'error') }
     }
-
-    return result
   }
 
   // updateSession wrapper: syncs comisión when anticipo/método cambia
@@ -221,6 +226,11 @@ function AppInner() {
 
     if (antipoChanged) {
       await syncAnticipoComision(next, prev)
+    }
+
+    // Apartado que por fin eligió fecha → misma confirmación que una reserva nueva
+    if (prev && !prev.fecha && result.data?.fecha) {
+      await sendBookingConfirmation(result.data)
     }
 
     return result
@@ -374,7 +384,7 @@ function AppInner() {
           } />
           <Route path="/estadisticas" element={
             <Suspense fallback={<div className="page-content" style={{ padding: 24, color: 'var(--text3)', fontSize: 13 }}>Cargando estadísticas…</div>}>
-              <Estadisticas sessions={sessions} gastos={gastos} pagos={pagos} extras={extras} extrasTableError={extrasTableError} />
+              <Estadisticas sessions={sessions} gastos={gastos} pagos={pagos} extras={extras} extrasTableError={extrasTableError} onSelectSession={onSelectSession} />
             </Suspense>
           } />
           <Route path="/config"       element={<Config comisionSchemaReady={comisionSchemaReady} />} />

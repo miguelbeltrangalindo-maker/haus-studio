@@ -1,13 +1,13 @@
 import { format, parseISO, differenceInDays, addDays, eachDayOfInterval } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { todayStr, fmtDate, esCortesia, ingresoAnticipo } from '../lib/utils'
+import { todayStr, fmtDate, esCortesia, ingresoAnticipo, resumenApartados, diasEsperando, mensajeApartado } from '../lib/utils'
 import { useConfig } from '../hooks/useConfig'
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   PieChart, Pie, Cell, Legend, BarChart, Bar,
 } from 'recharts'
 
-export default function Estadisticas({ sessions, gastos = [], pagos = [], extras = [], extrasTableError = false }) {
+export default function Estadisticas({ sessions, gastos = [], pagos = [], extras = [], extrasTableError = false, onSelectSession }) {
   const { config } = useConfig()
 
   const today = todayStr()
@@ -85,6 +85,9 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
   const cortesias      = rangeActive.filter(esCortesia).sort((a, b) => a.fecha > b.fecha ? 1 : -1)
   const valorCortesias = cortesias.reduce((a, s) => a + (+s.anticipo || 0), 0)
   const pctCortesias   = rangeActive.length > 0 ? Math.round((cortesias.length / rangeActive.length) * 100) : 0
+
+  // ── Apartados sin fecha (foto actual, independiente del período) ──
+  const apartados = resumenApartados(sessions)
 
   // ── Anticipos por método ──
   const anticipoEfectivo      = rangeActive.filter(s => s.metodo_anticipo === 'efectivo').reduce((a, s) => a + (+s.anticipo || 0), 0)
@@ -208,6 +211,12 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
       .replace(/{saldo}/g, `$${(+s.restante || 0).toLocaleString()}`)
       .replace(/{fecha}/g, fmtDate(s.fecha))
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank')
+  }
+
+  const waApartado = (s) => {
+    if (!s.telefono) return
+    const phone = '52' + s.telefono.replace(/\D/g, '').replace(/^52/, '')
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(mensajeApartado(s, config.studio_name || 'HAUS'))}`, '_blank')
   }
 
   const Kpi = ({ label, value, color }) => (
@@ -356,6 +365,56 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
             ))}
           </div>
         </div>
+
+        {/* ── Apartados sin fecha ── */}
+        {(apartados.pendientes.length > 0 || apartados.totalHistorico > 0) && (
+          <div className="stats-block">
+            <div className="section-title">Apartados sin fecha</div>
+            <div className="stat-kpis">
+              <Kpi label="Por agendar"         value={apartados.pendientes.length}                          color={apartados.pendientes.length > 0 ? 'violet' : ''} />
+              <Kpi label="Anticipos retenidos" value={`$${apartados.anticipoRetenido.toLocaleString()}`}    color={apartados.anticipoRetenido > 0 ? 'green' : ''} />
+              <Kpi label="Espera promedio"     value={`${apartados.diasPromedio} d`}                        color={apartados.diasPromedio >= 30 ? 'amber' : ''} />
+              <Kpi label="Tasa de agendado"    value={apartados.tasaAgendado == null ? '—' : `${apartados.tasaAgendado}%`}
+                color={apartados.tasaAgendado == null ? '' : apartados.tasaAgendado >= 80 ? 'green' : 'amber'} />
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 8, lineHeight: 1.5 }}>
+              Foto actual, no depende del período. El anticipo de un apartado entra en “Cobrado” cuando se agenda su fecha.
+              {apartados.totalHistorico > 0 && ` De ${apartados.totalHistorico} apartado${apartados.totalHistorico !== 1 ? 's' : ''} registrado${apartados.totalHistorico !== 1 ? 's' : ''}: ${apartados.agendados} ya ${apartados.agendados !== 1 ? 'agendaron' : 'agendó'}, ${apartados.perdidos} se cancel${apartados.perdidos !== 1 ? 'aron' : 'ó'}.`}
+              {apartados.porCobrar > 0 && ` Quedan $${apartados.porCobrar.toLocaleString()} por cobrar en estos apartados.`}
+            </div>
+            {apartados.pendientes.length > 0 && (
+              <div className="card" style={{ padding: '14px 20px', marginTop: 12 }}>
+                {apartados.pendientes.map(s => {
+                  const d = diasEsperando(s)
+                  return (
+                    <div key={s.id} className="breakdown-row"
+                      style={onSelectSession ? { cursor: 'pointer' } : undefined}
+                      onClick={() => onSelectSession?.(s)}>
+                      <div className="breakdown-label">{s.nombre}</div>
+                      <div className="breakdown-right">
+                        <span className={`apartados-dias${d >= 30 ? ' viejo' : ''}`}>
+                          {d === 0 ? 'hoy' : `${d} día${d !== 1 ? 's' : ''}`}
+                        </span>
+                        <span className="breakdown-amount" style={esCortesia(s) ? { color: 'var(--violet-l)' } : { color: 'var(--green-l)' }}>
+                          {esCortesia(s) ? 'Cortesía' : `$${ingresoAnticipo(s).toLocaleString()}`}
+                        </span>
+                        {s.telefono && (
+                          <button
+                            className="btn btn-wa btn-xs btn-icon"
+                            title="Pedir fecha por WhatsApp"
+                            onClick={e => { e.stopPropagation(); waApartado(s) }}
+                          >
+                            📅
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Cortesías ── */}
         <div className="stats-block">

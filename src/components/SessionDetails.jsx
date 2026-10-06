@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { fmtDate, todayStr, nextStatus, nextStatusLabel, esCortesia } from '../lib/utils'
+import { fmtDate, todayStr, nextStatus, nextStatusLabel, esCortesia, sinFecha, diasEsperando, mensajeApartado } from '../lib/utils'
 import { useConfig } from '../hooks/useConfig'
 import { useToast } from '../hooks/useToast'
 import { useConfirm } from './ConfirmDialog'
@@ -203,7 +203,9 @@ export default function SessionDetails({ session, onClose, updateSession, delete
   const openWA = (type) => {
     const phone = '52' + session.telefono.replace(/\D/g, '').replace(/^52/, '')
     let msg = ''
-    if (type === 'reminder') {
+    if (type === 'apartado') {
+      msg = mensajeApartado(session, config.studio_name || 'HAUS')
+    } else if (type === 'reminder') {
       msg = (config.reminder_message || '')
         .replace(/{nombre}/g, session.nombre)
         .replace(/{fecha}/g, fmtDate(session.fecha))
@@ -252,7 +254,7 @@ export default function SessionDetails({ session, onClose, updateSession, delete
   const handleSave = async (form) => {
     const result = await updateSession(session.id, form)
     if (result.error) { toast(result.error, 'error'); return result }
-    toast('Sesión actualizada', 'success')
+    toast(sinFecha(session) && form.fecha ? `Agendada para el ${fmtDate(form.fecha)} · ${form.hora}` : 'Sesión actualizada', 'success')
     setEditOpen(false)
     return result
   }
@@ -260,7 +262,7 @@ export default function SessionDetails({ session, onClose, updateSession, delete
   const handleDelete = async () => {
     const ok = await confirm({
       title: 'Cancelar esta sesión',
-      message: `${session.nombre} · ${fmtDate(session.fecha)}\n\nLa sesión queda con estatus "Cancelada" pero los registros se conservan.`,
+      message: `${session.nombre} · ${sinFecha(session) ? 'Sin fecha' : fmtDate(session.fecha)}\n\nLa sesión queda con estatus "Cancelada" pero los registros se conservan.`,
       confirmLabel: 'Cancelar sesión',
       cancelLabel: 'No, mantener',
       destructive: true,
@@ -315,6 +317,23 @@ export default function SessionDetails({ session, onClose, updateSession, delete
         )}
 
         {/* Date / Time */}
+        {sinFecha(session) ? (
+          <div className="dp-sinfecha">
+            <div>
+              <div className="dp-date-label">Apartado</div>
+              <div className="dp-sinfecha-title">Sin fecha</div>
+              <div className="dp-sinfecha-sub">
+                {(() => {
+                  const d = diasEsperando(session)
+                  return d === 0 ? 'Apartado hoy' : d === 1 ? 'Esperando desde ayer' : `Esperando hace ${d} días`
+                })()}
+              </div>
+            </div>
+            <button className="btn btn-primary btn-sm" onClick={() => setEditOpen(true)}>
+              Elegir fecha
+            </button>
+          </div>
+        ) : (
         <div className="dp-datetime">
           <div>
             <div className="dp-date-label">Fecha</div>
@@ -325,9 +344,10 @@ export default function SessionDetails({ session, onClose, updateSession, delete
             <div className="dp-time">{session.hora?.slice(0, 5)}</div>
           </div>
         </div>
+        )}
 
         {/* Status advance */}
-        {nextSt && (
+        {nextSt && !sinFecha(session) && (
           <div className="dp-section">
             <button
               className="btn btn-primary btn-sm"
@@ -685,6 +705,11 @@ export default function SessionDetails({ session, onClose, updateSession, delete
         <div className="dp-section">
           <div className="dp-section-label">WhatsApp</div>
           <div style={{ display: 'flex', gap: 6 }}>
+            {sinFecha(session) ? (
+              <button className="btn btn-wa btn-sm" onClick={() => openWA('apartado')} style={{ flex: 1 }}>
+                📅 Pedir fecha
+              </button>
+            ) : (
             <button
               className="btn btn-wa btn-sm"
               onClick={() => openWA('reminder')}
@@ -692,6 +717,7 @@ export default function SessionDetails({ session, onClose, updateSession, delete
             >
               {session.reminder_sent ? '✓ Recordatorio' : '📱 Recordatorio'}
             </button>
+            )}
             {session.link && (
               <button
                 className="btn btn-wa btn-sm"

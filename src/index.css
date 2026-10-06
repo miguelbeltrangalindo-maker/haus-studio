@@ -2058,3 +2058,31 @@ select.form-input option { background: var(--bg3); color: var(--text); }
 @media (max-width: 768px), (max-width: 1024px) and (orientation: landscape) and (hover: none) {
   .nav-search { display: none; }
 }
+
+/* ── Apartados sin fecha ─────────────────────────────────────── */
+.apartado-hint {
+  font-size: 12px; line-height: 1.5; color: var(--text2);
+  padding: 10px 12px; margin-bottom: 14px;
+  border-radius: var(--r2);
+  background: var(--violet-bg);
+  border: 1px solid rgba(139,92,246,.22);
+}
+.tag-sin-fecha {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 500; letter-spacing: .02em;
+  padding: 2px 8px; border-radius: var(--pill);
+  color: var(--violet-l); background: var(--violet-bg);
+  border: 1px dashed rgba(167,139,250,.45);
+  white-space: nowrap;
+}
+.dp-sinfecha {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 20px; border-bottom: 1px solid var(--border);
+}
+.dp-sinfecha-title {
+  font-family: 'Playfair Display', serif; font-style: italic;
+  font-size: 20px; color: var(--text); line-height: 1.1;
+}
+.dp-sinfecha-sub { font-size: 12px; color: var(--text3); margin-top: 4px; }
+.apartados-dias { font-size: 12px; color: var(--text3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.apartados-dias.viejo { color: var(--amber-l); }
