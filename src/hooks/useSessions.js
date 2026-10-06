@@ -6,8 +6,8 @@ export function useSessions() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
 
-  const fetch = useCallback(async () => {
-    setLoading(true)
+  const fetch = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true)
     const { data, error } = await supabase
       .from('sessions')
       .select('*')

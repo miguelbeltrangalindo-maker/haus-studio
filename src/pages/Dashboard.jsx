@@ -1,6 +1,6 @@
 import { format, addDays, parseISO } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { todayStr, tomorrowStr } from '../lib/utils'
+import { todayStr, tomorrowStr, ingresoAnticipo } from '../lib/utils'
 import { useConfig } from '../hooks/useConfig'
 import { useIsMobile } from '../hooks/useIsMobile'
 import { useNowMinutes } from '../hooks/useNowMinutes'
@@ -39,8 +39,8 @@ export default function Dashboard(props) {
     ['Completada', 'Entregada', 'Pendiente de entrega'].includes(s.estatus) &&
     (+s.restante === 0 || s.restante === '' || s.restante == null)
   )
-  const totalLiquidado = liquidadas.reduce((a, s) => a + (+s.anticipo || 0) + (+s.pagos || 0), 0)
-  const totalAnticipo  = rangeActive.reduce((a, s) => a + (+s.anticipo || 0), 0)
+  const totalLiquidado = liquidadas.reduce((a, s) => a + ingresoAnticipo(s) + (+s.pagos || 0), 0)
+  const totalAnticipo  = rangeActive.reduce((a, s) => a + ingresoAnticipo(s), 0)
   const totalRestante  = rangeActive.reduce((a, s) => a + (+s.restante || 0), 0)
 
   const todaySes    = sessions

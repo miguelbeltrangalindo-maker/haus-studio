@@ -13,15 +13,21 @@ export default async function handler(req, res) {
     process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
   )
 
-  const { data: session, error } = await supabase
-    .from('sessions')
-    .select('id, nombre, telefono, fecha, hora, estatus, reminder_sent')
-    .eq('id', session_id)
-    .single()
+  // confirmation_sent separa la confirmación del recordatorio programado; sin la
+  // columna (migración pendiente) se usa reminder_sent como antes.
+  const baseCols = 'id, nombre, telefono, fecha, hora, estatus, reminder_sent'
+  let flag = 'confirmation_sent'
+  let { data: session, error } = await supabase
+    .from('sessions').select(`${baseCols}, confirmation_sent`).eq('id', session_id).single()
+  if (error) {
+    flag = 'reminder_sent'
+    ;({ data: session, error } = await supabase
+      .from('sessions').select(baseCols).eq('id', session_id).single())
+  }
 
   if (error || !session) return res.status(404).json({ error: 'Session not found' })
   if (!session.telefono)  return res.status(200).json({ skipped: 'no phone' })
-  if (session.reminder_sent) return res.status(200).json({ skipped: 'already sent' })
+  if (session[flag]) return res.status(200).json({ skipped: 'already sent' })
   if (['Cancelada', 'No show'].includes(session.estatus)) {
     return res.status(200).json({ skipped: 'cancelled' })
   }
@@ -68,7 +74,7 @@ export default async function handler(req, res) {
 
     if (waRes.ok) {
       console.log(`Confirmation sent: ${session.nombre}, msg_id: ${waData.messages?.[0]?.id}`)
-      await supabase.from('sessions').update({ reminder_sent: true }).eq('id', session_id)
+      await supabase.from('sessions').update({ [flag]: true }).eq('id', session_id)
       return res.status(200).json({ sent: true })
     } else {
       console.error(`Confirmation error for session ${session_id}: code=${waData.error?.code}`)

@@ -599,7 +599,7 @@ select.form-input option { background: var(--bg3); color: var(--text); }
   background: rgba(5, 4, 10, .7);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  z-index: 200;
+  z-index: 300;
   display: flex; align-items: center; justify-content: center;
   padding: 20px;
   animation: overlay-in 180ms var(--ease-out);

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { fmtDate, nextStatus, nextStatusLabel } from '../lib/utils'
+import { fmtDate, todayStr, nextStatus, nextStatusLabel, esCortesia } from '../lib/utils'
 import { useConfig } from '../hooks/useConfig'
 import { useToast } from '../hooks/useToast'
 import { useConfirm } from './ConfirmDialog'
@@ -49,10 +49,23 @@ export default function SessionDetails({ session, onClose, updateSession, delete
   const pagosSum    = sessionPagos.reduce((a, p) => a + (+p.monto || 0), 0)
   const pagosDesync = sessionPagos.length > 0 && Math.abs((+session.pagos || 0) - pagosSum) > 0.01
 
+  // Una sesión futura prepagada (o con cupón) es normal; solo es raro si su fecha ya pasó
   const statusInconsistente =
     (+session.restante === 0 || !session.restante) &&
     +session.anticipo > 0 &&
-    ['Reservada', 'Confirmada'].includes(session.estatus)
+    session.fecha < todayStr() &&
+    ['Reservada', 'Confirmada', 'Llegó', 'En sesión'].includes(session.estatus)
+
+  const handleMarkCompletada = async () => {
+    setAdvancing(true)
+    const prevStatus = session.estatus
+    const result = await updateSession(session.id, { estatus: 'Completada' })
+    if (result.error) toast(result.error, 'error')
+    else toast(`${session.nombre.split(' ')[0]} → Completada`, 'success', {
+      action: { label: 'Deshacer', onClick: () => updateSession(session.id, { estatus: prevStatus }) },
+    })
+    setAdvancing(false)
+  }
 
   const handleAdvance = async () => {
     if (!nextSt) return
@@ -122,10 +135,11 @@ export default function SessionDetails({ session, onClose, updateSession, delete
     if (!ok) return
     setApplyingDesc(true)
     const newDesc = (+session.descuento || 0) + monto
-    await updateSession(session.id, {
+    const result = await updateSession(session.id, {
       restante: String(restante - monto),
       descuento: String(newDesc),
     })
+    if (result?.error) { toast(result.error, 'error'); setApplyingDesc(false); return }
     toast(`Descuento de $${monto.toLocaleString()} aplicado`, 'success')
     setDescuento('')
     setApplyingDesc(false)
@@ -287,9 +301,9 @@ export default function SessionDetails({ session, onClose, updateSession, delete
         {/* ── Consistency warnings ── */}
         {statusInconsistente && (
           <div className="dp-alert amber">
-            <span>Sesión liquidada pero en estatus <strong>{session.estatus}</strong>. ¿Avanzar a Completada?</span>
-            <button className="btn btn-xs btn-primary" onClick={handleAdvance} disabled={advancing}>
-              {advancing ? '…' : `→ ${nextLbl || 'Completada'}`}
+            <span>Sesión pasada y liquidada, pero sigue en <strong>{session.estatus}</strong>.</span>
+            <button className="btn btn-xs btn-primary" onClick={handleMarkCompletada} disabled={advancing}>
+              {advancing ? '…' : 'Marcar completada'}
             </button>
           </div>
         )}
@@ -331,8 +345,8 @@ export default function SessionDetails({ session, onClose, updateSession, delete
           <div className="dp-money">
             {+session.anticipo > 0 && (
               <div className="dp-money-item">
-                <div className="dp-money-label">Anticipo</div>
-                <div className="dp-money-value green">${(+session.anticipo).toLocaleString()}</div>
+                <div className="dp-money-label">{esCortesia(session) ? 'Cortesía' : 'Anticipo'}</div>
+                <div className={`dp-money-value${esCortesia(session) ? '' : ' green'}`} style={esCortesia(session) ? { color: 'var(--violet-l)' } : undefined}>${(+session.anticipo).toLocaleString()}</div>
               </div>
             )}
             {+session.restante > 0 && (
@@ -346,7 +360,7 @@ export default function SessionDetails({ session, onClose, updateSession, delete
                 <span className="dp-paid-badge">Liquidada ✓</span>
               </div>
             )}
-            {session.metodo_anticipo && (
+            {session.metodo_anticipo && !esCortesia(session) && (
               <div style={{ width: '100%', fontSize: 12, color: 'var(--text3)', marginTop: 2, textTransform: 'capitalize' }}>
                 Anticipo vía {session.metodo_anticipo}
               </div>
@@ -812,7 +826,6 @@ export default function SessionDetails({ session, onClose, updateSession, delete
           onSave={handleSave}
           onClose={() => setEditOpen(false)}
           onDelete={handleDelete}
-          createPago={createPago}
           sessions={sessions}
         />
       )}

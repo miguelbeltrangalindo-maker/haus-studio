@@ -1,6 +1,6 @@
 import { format, parseISO, differenceInDays, addDays, eachDayOfInterval } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { todayStr, fmtDate } from '../lib/utils'
+import { todayStr, fmtDate, esCortesia, ingresoAnticipo } from '../lib/utils'
 import { useConfig } from '../hooks/useConfig'
 import {
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -26,7 +26,7 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
   const rangeActive   = rangeSessions.filter(s => !['Cancelada', 'No show'].includes(s.estatus))
   const canceladas    = rangeSessions.filter(s => ['Cancelada', 'No show'].includes(s.estatus))
 
-  const totalAnticipo  = rangeActive.reduce((a, s) => a + (+s.anticipo || 0), 0)
+  const totalAnticipo  = rangeActive.reduce((a, s) => a + ingresoAnticipo(s), 0)
   const totalRestante  = rangeActive.reduce((a, s) => a + (+s.restante  || 0), 0)
 
   const totalDescuentos = rangeActive.reduce((a, s) => a + (+s.descuento || 0), 0)
@@ -35,21 +35,22 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
   const conDescuento = rangeActive
     .filter(s => +s.descuento > 0)
     .sort((a, b) => (+b.descuento) - (+a.descuento))
-  const cobradoConDescuento = conDescuento.reduce((a, s) => a + (+s.anticipo || 0) + (+s.pagos || 0), 0)
+  const cobradoConDescuento = conDescuento.reduce((a, s) => a + ingresoAnticipo(s) + (+s.pagos || 0), 0)
 
-  // Valor real por sesión = anticipo + pagos cobrados + saldo pendiente (descuentos ya aplicados al restante)
+  // Valor real por sesión = anticipo + pagos cobrados + saldo pendiente (descuentos ya aplicados al restante).
+  // Las cortesías no se facturan; solo sus cargos extra (si los hay) llegan vía pagos/restante.
   const totalFacturado = rangeActive.reduce((a, s) =>
-    a + (+s.anticipo || 0) + (+s.pagos || 0) + (+s.restante || 0), 0)
+    a + ingresoAnticipo(s) + (+s.pagos || 0) + (+s.restante || 0), 0)
 
   const liquidadas = rangeActive.filter(s =>
     ['Completada', 'Entregada', 'Pendiente de entrega'].includes(s.estatus) &&
     (+s.restante === 0 || s.restante === '' || s.restante == null)
   )
-  const totalLiquidado = liquidadas.reduce((a, s) => a + (+s.anticipo || 0) + (+s.pagos || 0), 0)
+  const totalLiquidado = liquidadas.reduce((a, s) => a + ingresoAnticipo(s) + (+s.pagos || 0), 0)
 
-  // Cobrado real: anticipos + pagos cobrados del saldo
+  // Cobrado real: anticipos + pagos cobrados del saldo (sin cortesías)
   const totalCobrado = rangeActive.reduce((a, s) =>
-    a + (+s.anticipo || 0) + (+s.pagos || 0), 0)
+    a + ingresoAnticipo(s) + (+s.pagos || 0), 0)
 
   const conDeuda = rangeActive.filter(s => +s.restante > 0)
   const pctCobrado = totalFacturado > 0 ? Math.round((totalCobrado / totalFacturado) * 100) : 0
@@ -80,9 +81,10 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
   } catch {}
   const promedioSesionesDia = diasConSesion > 0 ? (rangeActive.length / diasConSesion).toFixed(1) : '0'
 
-  // ── Cupones ──
-  const sessionesCupon  = rangeActive.filter(s => s.metodo_anticipo === 'cupon')
-  const totalCupon      = sessionesCupon.reduce((a, s) => a + (+s.anticipo || 0), 0)
+  // ── Cortesías ──
+  const cortesias      = rangeActive.filter(esCortesia).sort((a, b) => a.fecha > b.fecha ? 1 : -1)
+  const valorCortesias = cortesias.reduce((a, s) => a + (+s.anticipo || 0), 0)
+  const pctCortesias   = rangeActive.length > 0 ? Math.round((cortesias.length / rangeActive.length) * 100) : 0
 
   // ── Anticipos por método ──
   const anticipoEfectivo      = rangeActive.filter(s => s.metodo_anticipo === 'efectivo').reduce((a, s) => a + (+s.anticipo || 0), 0)
@@ -101,14 +103,13 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
   }, {})
   // Add anticipos by their method
   rangeActive.forEach(s => {
-    if (!s.metodo_anticipo || !+s.anticipo) return
-    metodosMap[s.metodo_anticipo] = (metodosMap[s.metodo_anticipo] || 0) + (+s.anticipo)
+    if (!s.metodo_anticipo || !ingresoAnticipo(s)) return
+    metodosMap[s.metodo_anticipo] = (metodosMap[s.metodo_anticipo] || 0) + ingresoAnticipo(s)
   })
   const METODOS = [
     { key: 'efectivo',      label: 'Efectivo' },
     { key: 'transferencia', label: 'Transferencia' },
     { key: 'tarjeta',       label: 'Tarjeta' },
-    { key: 'cupon',         label: 'Cupón' },
   ]
   const maxMetodo = Math.max(...Object.values(metodosMap), 1)
 
@@ -131,7 +132,7 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
       if (!key) return
       if (!map[key]) map[key] = { key, sesiones: 0, ingresos: 0 }
       map[key].sesiones++
-      map[key].ingresos += (+s.anticipo || 0) + (+s.pagos || 0)
+      map[key].ingresos += ingresoAnticipo(s) + (+s.pagos || 0)
     })
     return Object.values(map)
       .sort((a, b) => a.key > b.key ? 1 : -1)
@@ -152,7 +153,7 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
       const byDate = {}
       rangeActive.forEach(s => {
         const d = s.fecha
-        byDate[d] = (byDate[d] || 0) + (+s.anticipo || 0) + (+s.pagos || 0)
+        byDate[d] = (byDate[d] || 0) + ingresoAnticipo(s) + (+s.pagos || 0)
       })
       let acum = 0
       return days.map(d => {
@@ -333,7 +334,7 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
           <div className="section-title">Anticipos recibidos</div>
           <div className="stat-kpis">
             <Kpi label="Total anticipos"   value={`$${totalAnticipo.toLocaleString()}`}          color="green" />
-            <Kpi label="Sesiones con ant." value={rangeActive.filter(s => +s.anticipo > 0).length} />
+            <Kpi label="Sesiones con ant." value={rangeActive.filter(s => ingresoAnticipo(s) > 0).length} />
             <Kpi label="Efectivo"          value={`$${anticipoEfectivo.toLocaleString()}`}        color={anticipoEfectivo > 0 ? 'green' : ''} />
             <Kpi label="Transferencia"     value={`$${anticipoTransferencia.toLocaleString()}`}   color={anticipoTransferencia > 0 ? 'green' : ''} />
           </div>
@@ -356,31 +357,34 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
           </div>
         </div>
 
-        {/* ── Cupones ── */}
-        {(sessionesCupon.length > 0 || rangeActive.some(s => s.metodo_anticipo === 'cupon')) && (
-          <div className="stats-block">
-            <div className="section-title">Cupones</div>
-            <div className="stat-kpis">
-              <Kpi label="Sesiones con cupón"  value={sessionesCupon.length}                    color={sessionesCupon.length > 0 ? 'violet' : ''} />
-              <Kpi label="Costo total cubierto" value={`$${totalCupon.toLocaleString()}`}        color={totalCupon > 0 ? 'green' : ''} />
-              <Kpi label="Promedio por cupón"   value={sessionesCupon.length > 0 ? `$${Math.round(totalCupon / sessionesCupon.length).toLocaleString()}` : '—'} />
-            </div>
-            {sessionesCupon.length > 0 && (
-              <div className="card" style={{ padding: '14px 20px', marginTop: 12 }}>
-                <div className="section-title" style={{ marginBottom: 10 }}>Sesiones con cupón</div>
-                {sessionesCupon.map(s => (
-                  <div key={s.id} className="breakdown-row">
-                    <div className="breakdown-label">{s.nombre}</div>
-                    <div className="breakdown-right">
-                      <span className="breakdown-date">{s.fecha}</span>
-                      <span className="breakdown-amount" style={{ color: 'var(--violet-l)' }}>${(+s.anticipo).toLocaleString()}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+        {/* ── Cortesías ── */}
+        <div className="stats-block">
+          <div className="section-title">Cortesías</div>
+          <div className="stat-kpis">
+            <Kpi label="Cortesías en el período" value={cortesias.length} color={cortesias.length > 0 ? 'violet' : ''} />
+            <Kpi label="Valor regalado"          value={`$${valorCortesias.toLocaleString()}`} />
+            <Kpi label="% de las sesiones"       value={`${pctCortesias}%`} />
           </div>
-        )}
+          <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 8 }}>
+            No cuentan como ingreso: el valor regalado es informativo.
+          </div>
+          {cortesias.length > 0 && (
+            <div className="card" style={{ padding: '14px 20px', marginTop: 12 }}>
+              {cortesias.map(s => (
+                <div key={s.id} className="breakdown-row">
+                  <div className="breakdown-label">
+                    {s.nombre}
+                    {s.notas && <span style={{ fontSize: 11, color: 'var(--text3)', marginLeft: 6 }}>· {s.notas}</span>}
+                  </div>
+                  <div className="breakdown-right">
+                    <span className="breakdown-date">{fmtDate(s.fecha)}</span>
+                    <span className="breakdown-amount" style={{ color: 'var(--violet-l)' }}>${(+s.anticipo || 0).toLocaleString()}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* ── Cobros ── */}
         <div className="stats-block">
@@ -437,7 +441,7 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
                       −${(+s.descuento).toLocaleString()}
                     </span>
                     <span className="breakdown-amount green" style={{ minWidth: 76, textAlign: 'right' }}>
-                      ${((+s.anticipo || 0) + (+s.pagos || 0)).toLocaleString()}
+                      ${(ingresoAnticipo(s) + (+s.pagos || 0)).toLocaleString()}
                     </span>
                   </div>
                 </div>

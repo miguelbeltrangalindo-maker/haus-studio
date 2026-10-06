@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, format } from 'date-fns'
-import { todayStr, tomorrowStr, initials, fmtDate, ALL_STATUSES } from '../lib/utils'
+import { esCortesia, todayStr, tomorrowStr, initials, fmtDate, ALL_STATUSES } from '../lib/utils'
 import { useToast } from '../hooks/useToast'
 import { useConfirm } from '../components/ConfirmDialog'
 import Badge from '../components/Badge'
@@ -22,12 +23,16 @@ const QUICK = [
   { label: 'Rango',            key: 'rango' },
 ]
 
-export default function Sesiones({ sessions, loading, createSession, updateSession, createPago, onSelectSession }) {
+export default function Sesiones({ sessions, loading, createSession, updateSession, onSelectSession }) {
   const toast = useToast()
   const confirm = useConfirm()
   const { config } = useConfig()
   const [search, setSearch] = useState('')
-  const [quick,  setQuick]  = useState('')
+  const [searchParams] = useSearchParams()
+  const [quick,  setQuick]  = useState(() => {
+    const f = searchParams.get('f') || ''
+    return QUICK.some(q => q.key === f) ? f : ''
+  })
   const [rangeFrom, setRangeFrom] = useState('')
   const [rangeTo,   setRangeTo]   = useState('')
   const [modal,  setModal]  = useState(null)
@@ -53,7 +58,7 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
     if (quick === 'mes')       list = list.filter(s => s.fecha >= monthStart && s.fecha <= monthEnd)
     if (quick === 'en-sesion') list = list.filter(s => s.estatus === 'En sesión')
     if (quick === 'pendiente') list = list.filter(s => s.estatus === 'Pendiente de entrega')
-    if (quick === 'pago')      list = list.filter(s => +s.restante > 0)
+    if (quick === 'pago')      list = list.filter(s => +s.restante > 0 && !['Cancelada', 'No show'].includes(s.estatus))
     if (quick === 'entregada') list = list.filter(s => s.estatus === 'Entregada')
     if (quick === 'cancelada') list = list.filter(s => s.estatus === 'Cancelada')
     if (quick === 'rango') {
@@ -249,7 +254,7 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
                         <div className="session-card-money">
                           {+s.anticipo > 0 && (
                             <span style={{ color: 'var(--green)' }}>
-                              ${(+s.anticipo).toLocaleString()} ant.
+                              {esCortesia(s) ? 'Cortesía' : `$${(+s.anticipo).toLocaleString()} ant.`}
                             </span>
                           )}
                           {+s.pagos > 0 && (
@@ -307,7 +312,6 @@ export default function Sesiones({ sessions, loading, createSession, updateSessi
           onSave={handleSave}
           onClose={() => setModal(null)}
           onDelete={handleDelete}
-          createPago={createPago}
           sessions={sessions}
         />
       )}

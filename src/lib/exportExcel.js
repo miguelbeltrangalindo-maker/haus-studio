@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { esCortesia, ingresoAnticipo } from './utils'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 const today = () => format(new Date(), 'yyyy-MM-dd')
@@ -44,7 +45,7 @@ export function exportSesiones(sessions) {
   ]
 
   const rows = sessions.map(s => {
-    const anticipo   = +s.anticipo  || 0
+    const anticipo   = ingresoAnticipo(s)
     const pagos      = +s.pagos     || 0
     const restante   = +s.restante  || 0
     const descuento  = +s.descuento || 0
@@ -58,7 +59,7 @@ export function exportSesiones(sessions) {
       s.ninos         || 0,
       s.estatus       || '',
       anticipo,
-      s.metodo_anticipo || '',
+      esCortesia(s) ? `Cortesía ($${(+s.anticipo || 0).toLocaleString()})` : (s.metodo_anticipo || ''),
       pagos,
       restante,
       descuento,
@@ -104,7 +105,7 @@ export function exportClientes(sessions) {
     const activas  = c.sesiones.filter(s => !['Cancelada', 'No show'].includes(s.estatus))
     const sorted   = [...c.sesiones].sort((a, b) => b.fecha > a.fecha ? 1 : -1)
     const latest   = sorted[0]
-    const totalGastado   = activas.reduce((a, s) => a + (+s.anticipo || 0) + (+s.pagos || 0), 0)
+    const totalGastado   = activas.reduce((a, s) => a + ingresoAnticipo(s) + (+s.pagos || 0), 0)
     const saldoPendiente = activas.reduce((a, s) => a + (+s.restante  || 0), 0)
     return {
       nombre: latest?.nombre || c.nombre,
@@ -151,7 +152,7 @@ export function exportClientes(sessions) {
       .sort((a, b) => b.fecha > a.fecha ? 1 : -1)
     clientSessions.forEach(s => rows2.push([
       c.nombre, c.telefono, fmtFecha(s.fecha), s.hora?.slice(0, 5) || '',
-      s.personas, s.estatus, +s.anticipo || 0, +s.pagos || 0, +s.restante || 0,
+      s.personas, s.estatus, ingresoAnticipo(s), +s.pagos || 0, +s.restante || 0,
     ]))
   })
   const ws2 = XLSX.utils.aoa_to_sheet([hdrs2, ...rows2])
@@ -253,7 +254,7 @@ export function exportEstadisticas({ sessions, gastos, pagos, extras, rangeStart
   )
   const rangeGastos = gastos.filter(g => g.fecha >= rangeStart && g.fecha <= rangeEnd)
 
-  const totalAnticipo  = rangeActive.reduce((a, s) => a + (+s.anticipo  || 0), 0)
+  const totalAnticipo  = rangeActive.reduce((a, s) => a + ingresoAnticipo(s), 0)
   const totalPagos     = rangeActive.reduce((a, s) => a + (+s.pagos     || 0), 0)
   const totalRestante  = rangeActive.reduce((a, s) => a + (+s.restante  || 0), 0)
   const totalFacturado = totalAnticipo + totalPagos + totalRestante
@@ -289,7 +290,7 @@ export function exportEstadisticas({ sessions, gastos, pagos, extras, rangeStart
     ['Sesiones activas',           rangeActive.length],
     ['Canceladas / No show',       canceladas.length],
     ['Liquidadas (saldo en cero)', liquidadas.length],
-    ['Sesiones con anticipo',      rangeActive.filter(s => +s.anticipo > 0).length],
+    ['Sesiones con anticipo',      rangeActive.filter(s => ingresoAnticipo(s) > 0).length],
     ['Sesiones con deuda',         rangeActive.filter(s => +s.restante > 0).length],
     ['Tasa de cancelación',        canceladas.length + rangeActive.length > 0
       ? `${Math.round(canceladas.length / (canceladas.length + rangeActive.length) * 100)}%` : '0%'],
@@ -302,8 +303,8 @@ export function exportEstadisticas({ sessions, gastos, pagos, extras, rangeStart
     ['Total anticipos',            totalAnticipo],
     ['Anticipos efectivo',         rangeActive.filter(s => s.metodo_anticipo === 'efectivo').reduce((a, s) => a + (+s.anticipo || 0), 0)],
     ['Anticipos transferencia',    rangeActive.filter(s => s.metodo_anticipo === 'transferencia').reduce((a, s) => a + (+s.anticipo || 0), 0)],
-    ['Cupones usados (count)',      rangeActive.filter(s => s.metodo_anticipo === 'cupon').length],
-    ['Cupones usados (monto)',      rangeActive.filter(s => s.metodo_anticipo === 'cupon').reduce((a, s) => a + (+s.anticipo || 0), 0)],
+    ['Cortesías (sesiones)',       rangeActive.filter(esCortesia).length],
+    ['Cortesías (valor regalado)', rangeActive.filter(esCortesia).reduce((a, s) => a + (+s.anticipo || 0), 0)],
   ])
 
   // Format currency rows (column B)
@@ -328,8 +329,8 @@ export function exportEstadisticas({ sessions, gastos, pagos, extras, rangeStart
     ['Estatus', 'Cantidad', 'Facturado', 'Cobrado', 'Saldo pendiente'],
     ...STATUS_MAP.map(({ label, statuses }) => {
       const group = sessions.filter(s => s.fecha >= rangeStart && s.fecha <= rangeEnd && statuses.includes(s.estatus))
-      const fact  = group.reduce((a, s) => a + (+s.anticipo || 0) + (+s.pagos || 0) + (+s.restante || 0), 0)
-      const cob   = group.reduce((a, s) => a + (+s.anticipo || 0) + (+s.pagos || 0), 0)
+      const fact  = group.reduce((a, s) => a + ingresoAnticipo(s) + (+s.pagos || 0) + (+s.restante || 0), 0)
+      const cob   = group.reduce((a, s) => a + ingresoAnticipo(s) + (+s.pagos || 0), 0)
       const saldo = group.reduce((a, s) => a + (+s.restante || 0), 0)
       return [label, group.length, fact, cob, saldo]
     }),
@@ -369,8 +370,8 @@ export function exportEstadisticas({ sessions, gastos, pagos, extras, rangeStart
     return acc
   }, {})
   rangeActive.forEach(s => {
-    if (!s.metodo_anticipo || !+s.anticipo) return
-    metodosMap[s.metodo_anticipo] = (metodosMap[s.metodo_anticipo] || 0) + (+s.anticipo)
+    if (!s.metodo_anticipo || !ingresoAnticipo(s)) return
+    metodosMap[s.metodo_anticipo] = (metodosMap[s.metodo_anticipo] || 0) + ingresoAnticipo(s)
   })
   const wsMetodos = XLSX.utils.aoa_to_sheet([
     ['Método de pago', 'Monto cobrado', '% del cobro total'],
@@ -393,7 +394,7 @@ export function exportEstadisticas({ sessions, gastos, pagos, extras, rangeStart
     ['Cliente', 'Teléfono', 'Fecha sesión', 'Estatus', 'Anticipo', 'Pagos cobrados', 'Saldo pendiente'],
     ...deudores.map(s => [
       s.nombre, s.telefono, fmtFecha(s.fecha), s.estatus,
-      +s.anticipo || 0, +s.pagos || 0, +s.restante || 0,
+      ingresoAnticipo(s), +s.pagos || 0, +s.restante || 0,
     ]),
     ['', '', '', 'TOTAL', '', '', deudores.reduce((a, s) => a + (+s.restante || 0), 0)],
   ])

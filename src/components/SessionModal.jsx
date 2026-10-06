@@ -4,18 +4,13 @@ import { useConfig } from '../hooks/useConfig'
 import { useToast } from '../hooks/useToast'
 import Badge from './Badge'
 
-const METHODS = [
-  { key: 'efectivo',      label: 'Efectivo' },
-  { key: 'transferencia', label: 'Transferencia' },
-  { key: 'tarjeta',       label: 'Tarjeta' },
-]
 const ANTICIPO_METHODS = [
   { key: 'efectivo',      label: 'Efectivo' },
   { key: 'transferencia', label: 'Transferencia' },
-  { key: 'cupon',         label: 'Cupón' },
+  { key: 'cupon',         label: 'Cortesía' },
 ]
 
-export default function SessionModal({ session, prefillDate, prefillHora, onSave, onClose, onDelete, createPago, sessions = [] }) {
+export default function SessionModal({ session, prefillDate, prefillHora, onSave, onClose, onDelete, sessions = [] }) {
   const { config } = useConfig()
   const toast = useToast()
   const isNew = !session?.id
@@ -43,13 +38,10 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
   })
   const [saving, setSaving] = useState(false)
 
-  // Payment panel state
-  const [payAmount, setPayAmount]   = useState('')
-  const [payMethod, setPayMethod]   = useState('efectivo')
-
+  // Solo al abrir otra sesión: si el registro cambia mientras se edita, no se pisan los cambios del usuario
   useEffect(() => {
-    if (session) setForm(f => ({ ...f, ...session }))
-  }, [session])
+    if (session) setForm(f => ({ ...f, ...session, hora: session.hora?.slice(0, 5) || f.hora }))
+  }, [session?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
@@ -94,11 +86,14 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
     if (!form.fecha) { toast('La fecha es requerida', 'error'); return }
     if (!form.hora)  { toast('La hora es requerida', 'error'); return }
     const hora = form.hora.slice(0, 5)
+    // Reglas de horario solo aplican al agendar o reagendar: una sesión existente
+    // no debe quedar bloqueada si después cambió el horario o se bloqueó su fecha.
+    const reagenda = isNew || form.fecha !== session?.fecha || hora !== session?.hora?.slice(0, 5)
     const openTime  = (config.open_time  || '00:00').slice(0, 5)
     const closeTime = (config.close_time || '23:59').slice(0, 5)
-    if (hora < openTime)  { toast(`La hora no puede ser antes de la apertura (${openTime})`, 'error'); return }
-    if (hora > closeTime) { toast(`La hora no puede ser después del cierre (${closeTime})`, 'error'); return }
-    if (isNew) {
+    if (reagenda && hora < openTime)   { toast(`La hora no puede ser antes de la apertura (${openTime})`, 'error'); return }
+    if (reagenda && hora >= closeTime) { toast(`La última sesión debe empezar antes del cierre (${closeTime})`, 'error'); return }
+    if (reagenda) {
       const now = new Date()
       const nowStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
       const nowTime = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
@@ -110,24 +105,26 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
     const closedWeekdays = config.closed_weekdays || []
     const blockedDates   = config.blocked_dates   || []
     const DIAS = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado']
-    if (closedWeekdays.includes(dayOfWeek)) {
+    if (reagenda && closedWeekdays.includes(dayOfWeek)) {
       toast(`El estudio está cerrado los ${DIAS[dayOfWeek]}`, 'error'); return
     }
-    if (blockedDates.includes(form.fecha)) {
+    if (reagenda && blockedDates.includes(form.fecha)) {
       toast('Esa fecha está bloqueada', 'error'); return
     }
     if (+form.anticipo > 0 && !form.metodo_anticipo) {
       toast('Selecciona el método del anticipo', 'error'); return
     }
     if (form.metodo_anticipo === 'cupon' && !(+form.anticipo > 0)) {
-      toast('Ingresa el costo de sesión cubierto por el cupón', 'error'); return
+      toast('Ingresa el valor de la sesión de cortesía', 'error'); return
     }
     if (form.metodo_anticipo === 'cupon' && !form.notas.trim()) {
-      toast('Las notas internas son obligatorias al usar cupón (indica el tipo)', 'error'); return
+      toast('Indica en notas internas el motivo de la cortesía', 'error'); return
     }
     const toNum = v => (v === '' || v == null) ? null : +v
     const payload = {
       ...form,
+      hora,
+      nombre:    form.nombre.trim(),
       anticipo:  toNum(form.anticipo),
       restante:  toNum(form.restante),
       descuento: toNum(form.descuento),
@@ -142,57 +139,8 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
     setSaving(false)
   }
 
-  // ── Cobrar saldo ──
-  const handleCobrar = async () => {
-    const amount = +payAmount
-    if (!amount || amount <= 0) { toast('Ingresa un monto válido', 'error'); return }
-    // Saldo efectivo considerando cambios de descuento aún no guardados
-    const currentRestante = Math.max(0, (+form.restante || 0) - descDelta)
-    if (amount > currentRestante) { toast(`El monto no puede superar $${currentRestante.toLocaleString()}`, 'error'); return }
-    const newRestante = Math.max(0, currentRestante - amount)
-    const updated = {
-      ...form,
-      restante:    String(newRestante),
-      metodo_pago: payMethod,
-      pagos:       (+form.pagos || 0) + amount, // accumulate balance collected
-      // If now fully paid and was in "Pendiente de pago", advance to Completada
-      estatus: (newRestante === 0 && form.estatus === 'Pendiente de pago') ? 'Completada' : form.estatus,
-    }
-    setSaving(true)
-    const result = await onSave(updated)
-    if (result?.error) { setSaving(false); return }
-    // Registrar el cobro en el historial (y su comisión si aplica)
-    if (createPago && session?.id) {
-      const pr = await createPago(session.id, amount, payMethod)
-      if (pr?.error) toast('El cobro se aplicó pero no quedó en el historial de pagos', 'error')
-    }
-    setSaving(false)
-  }
-
-  const openWhatsApp = (type) => {
-    const phone = '52' + form.telefono.replace(/\D/g, '').replace(/^52/, '')
-    let msg = ''
-    if (type === 'reminder') {
-      msg = (config.reminder_message || '')
-        .replace(/{nombre}/g, form.nombre)
-        .replace(/{fecha}/g, fmtDate(form.fecha))
-        .replace(/{hora}/g, form.hora?.slice(0, 5) || form.hora)
-      set('reminder_sent', true)
-      onSave({ ...form, reminder_sent: true })
-    } else {
-      if (!form.link) { toast('Agrega primero el vínculo de fotos', 'error'); return }
-      msg = (config.delivery_message || '')
-        .replace(/{nombre}/g, form.nombre)
-        .replace(/{link}/g, form.link)
-      set('link_sent', true)
-      onSave({ ...form, link_sent: true })
-    }
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank')
-  }
-
   const nextSt  = nextStatus(form.estatus)
   const nextLbl = nextStatusLabel(form.estatus)
-  const hasPending = !isNew && (+form.restante > 0)
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -291,11 +239,11 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
         <div className="form-grid">
           <div className="form-group">
             <label className="form-label">
-              {form.metodo_anticipo === 'cupon' ? 'Costo de sesión (cupón) *' : 'Anticipo recibido ($)'}
+              {form.metodo_anticipo === 'cupon' ? 'Valor de la cortesía ($) *' : 'Anticipo recibido ($)'}
             </label>
             <input className="form-input" type="number" inputMode="decimal" min="0" value={form.anticipo}
               onChange={e => set('anticipo', e.target.value)}
-              placeholder={form.metodo_anticipo === 'cupon' ? 'Costo total de la sesión' : '0'} />
+              placeholder={form.metodo_anticipo === 'cupon' ? 'Valor de la sesión (no cuenta como ingreso)' : '0'} />
           </div>
           <div className="form-group">
             <label className="form-label">
@@ -345,72 +293,6 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
           )}
         </div>
 
-        {/* ── Cobrar saldo pendiente ── */}
-        {hasPending && (
-          <>
-            <div className="modal-section-title" style={{ color: 'var(--amber-l)' }}>
-              Cobrar saldo
-            </div>
-            <div className="payment-panel">
-              <div className="payment-summary">
-                <span className="payment-summary-label">Por cobrar</span>
-                <span className="payment-summary-amount">${(+form.restante).toLocaleString()}</span>
-              </div>
-
-              <div className="form-grid">
-                <div className="form-group">
-                  <label className="form-label">Monto a cobrar ($)</label>
-                  <input
-                    className="form-input"
-                    type="number"
-                    inputMode="decimal"
-                    min="1"
-                    max={form.restante}
-                    value={payAmount}
-                    onChange={e => setPayAmount(e.target.value)}
-                    placeholder={form.restante}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Método de pago</label>
-                  <div className="method-tabs">
-                    {METHODS.map(m => (
-                      <button
-                        key={m.key}
-                        type="button"
-                        className={`method-tab ${payMethod === m.key ? 'active' : ''}`}
-                        onClick={() => setPayMethod(m.key)}
-                      >
-                        {m.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={handleCobrar}
-                  disabled={saving || !payAmount || +payAmount <= 0}
-                >
-                  {saving ? 'Guardando…' : (+payAmount > 0 ? `Cobrar $${(+payAmount).toLocaleString()}` : 'Cobrar')}
-                </button>
-                {payAmount && +payAmount > 0 && +payAmount < +form.restante && (
-                  <span style={{ fontSize: 12, color: 'var(--text3)' }}>
-                    Quedará pendiente: ${(+form.restante - +payAmount).toLocaleString()}
-                  </span>
-                )}
-                {payAmount && +payAmount >= +form.restante && (
-                  <span style={{ fontSize: 12, color: 'var(--green-l)' }}>
-                    Saldo liquidado ✓
-                  </span>
-                )}
-              </div>
-            </div>
-          </>
-        )}
-
         {/* Notas y entrega */}
         <div className="modal-section-title">Notas y entrega</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -421,7 +303,7 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
             <textarea className="form-input" value={form.notas}
               onChange={e => set('notas', e.target.value)}
               placeholder={form.metodo_anticipo === 'cupon'
-                ? 'Tipo de Cupón: '
+                ? 'Motivo de la cortesía: '
                 : 'Trae bebé, quiere foto familiar, liquidar en efectivo…'}
               style={form.metodo_anticipo === 'cupon' && !form.notas.trim()
                 ? { borderColor: 'var(--amber)', boxShadow: '0 0 0 2px color-mix(in srgb, var(--amber) 20%, transparent)' }
@@ -467,31 +349,16 @@ export default function SessionModal({ session, prefillDate, prefillHora, onSave
 
         {/* Footer */}
         <div className="modal-footer">
-          <button className="btn btn-ghost" onClick={onClose}>Cancelar</button>
-
-          {!isNew && (
-            <>
-              <button className="btn btn-wa btn-sm" onClick={() => openWhatsApp('reminder')}
-                style={form.reminder_sent ? { opacity: .65 } : {}}>
-                {form.reminder_sent ? '✓ Recordatorio' : '📱 Recordatorio'}
-              </button>
-              {form.link && (
-                <button className="btn btn-wa btn-sm" onClick={() => openWhatsApp('delivery')}
-                  style={form.link_sent ? { opacity: .65 } : {}}>
-                  {form.link_sent ? '✓ Fotos enviadas' : '📸 Enviar fotos'}
-                </button>
-              )}
-              <button className="btn btn-danger btn-sm" onClick={() => onDelete?.()}>
-                Cancelar sesión
-              </button>
-            </>
+          {!isNew && onDelete && (
+            <button className="btn btn-danger btn-sm" onClick={() => onDelete()} style={{ marginRight: 'auto' }}>
+              Cancelar sesión
+            </button>
           )}
-
+          <button className="btn btn-ghost" onClick={onClose}>Cerrar</button>
           <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? 'Guardando…' : 'Guardar'}
+            {saving ? 'Guardando…' : isNew ? 'Agendar sesión' : 'Guardar cambios'}
           </button>
         </div>
-
       </div>
     </div>
   )

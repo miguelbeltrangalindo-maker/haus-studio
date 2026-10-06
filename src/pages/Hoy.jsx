@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { todayStr, fmtDate, initials, statusClass, nextStatus, nextStatusLabel } from '../lib/utils'
+import { esCortesia, ingresoAnticipo, todayStr, fmtDate, initials, statusClass, nextStatus, nextStatusLabel } from '../lib/utils'
 import { SkeletonRows } from '../components/Skeleton'
 
 const QUICK_FLOW = [
@@ -21,6 +21,7 @@ const getQuickActions = (estatus) => {
   return QUICK_FLOW.slice(idx, idx + 3)
 }
 import { useConfig } from '../hooks/useConfig'
+import { useNowMinutes } from '../hooks/useNowMinutes'
 import { useToast } from '../hooks/useToast'
 import { useConfirm } from '../components/ConfirmDialog'
 import Badge from '../components/Badge'
@@ -28,7 +29,7 @@ import SessionModal from '../components/SessionModal'
 import QuickCobrarSheet from '../components/QuickCobrarSheet'
 import CorteSheet from '../components/CorteSheet'
 
-export default function Hoy({ sessions, loading, createSession, updateSession, createPago, deletePago, pagos = [], gastos = [] }) {
+export default function Hoy({ sessions, loading, fetch: refresh, createSession, updateSession, createPago, deletePago, pagos = [], gastos = [] }) {
   const { config } = useConfig()
   const toast = useToast()
   const confirm = useConfirm()
@@ -48,7 +49,7 @@ export default function Hoy({ sessions, loading, createSession, updateSession, c
         body: JSON.stringify({ session_id: s.id }),
       })
       const data = await res.json()
-      if (data.sent)    { toast(`Plantilla enviada a ${(s.nombre || '').split(' ')[0]}`, 'success') }
+      if (data.sent)    { toast(`Plantilla enviada a ${(s.nombre || '').split(' ')[0]}`, 'success'); refresh?.({ silent: true }) }
       else if (data.skipped === 'already sent') { toast('WhatsApp ya se había enviado', 'info') }
       else              { toast('No se pudo enviar WhatsApp', 'error') }
     } catch { toast('No se pudo enviar WhatsApp', 'error') }
@@ -56,6 +57,11 @@ export default function Hoy({ sessions, loading, createSession, updateSession, c
   }
 
   const today = todayStr()
+  const nowMinutes = useNowMinutes()
+  const yaPaso = (s) => {
+    const [h, m] = (s.hora || '00:00').split(':').map(Number)
+    return h * 60 + m + 15 <= nowMinutes
+  }
 
   const todaySessions = sessions
     .filter(s => s.fecha === today && s.estatus !== 'Cancelada')
@@ -65,7 +71,7 @@ export default function Hoy({ sessions, loading, createSession, updateSession, c
   const todayActivas = todaySessions.filter(s => s.estatus !== 'No show')
   const completadas  = todayActivas.filter(s => ['Completada', 'Entregada', 'Pendiente de entrega'].includes(s.estatus)).length
   const pendientes   = todayActivas.filter(s => ['Reservada', 'Confirmada', 'Llegó', 'En sesión'].includes(s.estatus)).length
-  const cobrado      = todayActivas.reduce((a, s) => a + (+s.anticipo || 0) + (+s.pagos || 0), 0)
+  const cobrado      = todayActivas.reduce((a, s) => a + ingresoAnticipo(s) + (+s.pagos || 0), 0)
   const porCobrar    = todayActivas.reduce((a, s) => a + (+s.restante || 0), 0)
 
   const dateLabel = format(new Date(), "EEEE, d 'de' MMMM yyyy", { locale: es })
@@ -210,7 +216,7 @@ export default function Hoy({ sessions, loading, createSession, updateSession, c
                   <div className="hoy-meta">
                     {s.telefono}
                     {' · '}{s.personas} {s.personas === 1 ? 'persona' : 'personas'}
-                    {+s.anticipo > 0 && ` · $${(+s.anticipo).toLocaleString()} anticipo`}
+                    {esCortesia(s) ? ' · cortesía' : +s.anticipo > 0 && ` · $${(+s.anticipo).toLocaleString()} anticipo`}
                     {+s.restante > 0 && (
                       <span style={{ color: 'var(--amber)' }}>
                         {` · $${(+s.restante).toLocaleString()} saldo`}
@@ -233,16 +239,22 @@ export default function Hoy({ sessions, loading, createSession, updateSession, c
                       </button>
                     ))}
 
+                    {['Reservada', 'Confirmada'].includes(s.estatus) && yaPaso(s) && (
+                      <button className="btn btn-ghost btn-sm" onClick={() => handleQuick(s, 'No show')}>
+                        No llegó
+                      </button>
+                    )}
+
                     {/* Plantilla WA — envío directo via API */}
                     {s.telefono && (
                       <button
-                        className={`btn btn-wa btn-sm ${s.reminder_sent ? 'btn-ghost' : ''}`}
-                        style={s.reminder_sent ? { color: 'var(--green-l)' } : {}}
+                        className={`btn btn-wa btn-sm ${(s.confirmation_sent ?? s.reminder_sent) ? 'btn-ghost' : ''}`}
+                        style={(s.confirmation_sent ?? s.reminder_sent) ? { color: 'var(--green-l)' } : {}}
                         disabled={sendingWA.has(s.id)}
                         onClick={e => sendTemplate(s, e)}
                         title="Enviar plantilla de confirmación por WhatsApp"
                       >
-                        {sendingWA.has(s.id) ? '…' : s.reminder_sent ? '✓ WA enviado' : 'Enviar WA'}
+                        {sendingWA.has(s.id) ? '…' : (s.confirmation_sent ?? s.reminder_sent) ? '✓ WA enviado' : 'Enviar WA'}
                       </button>
                     )}
 
@@ -305,7 +317,6 @@ export default function Hoy({ sessions, loading, createSession, updateSession, c
           onSave={handleSave}
           onClose={() => setModal(null)}
           onDelete={handleDelete}
-          createPago={createPago}
           sessions={sessions}
         />
       )}

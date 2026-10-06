@@ -120,3 +120,8 @@ export const getTimeSlots = (open = '09:00', close = '20:00', block = 30) => {
 export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
 
 export const weekDays = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+
+// ── Dinero ─────────────────────────────────────────────────────
+// metodo_anticipo 'cupon' = cortesía: el anticipo registra el valor regalado, no dinero recibido
+export const esCortesia = (s) => s?.metodo_anticipo === 'cupon'
+export const ingresoAnticipo = (s) => esCortesia(s) ? 0 : (+s?.anticipo || 0)

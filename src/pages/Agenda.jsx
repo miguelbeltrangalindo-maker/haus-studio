@@ -1,14 +1,14 @@
 import { Fragment, useState, useEffect } from 'react'
 import { format, addDays, startOfWeek, addWeeks, subWeeks, addMonths, subMonths, getDaysInMonth, startOfMonth, getDay } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { getTimeSlots, statusClass, weekDays, fmtDate, todayStr } from '../lib/utils'
+import { esCortesia, ingresoAnticipo, getTimeSlots, statusClass, weekDays, fmtDate, todayStr } from '../lib/utils'
 import { useConfig } from '../hooks/useConfig'
 import { useToast } from '../hooks/useToast'
 import { useConfirm } from '../components/ConfirmDialog'
 import Badge from '../components/Badge'
 import SessionModal from '../components/SessionModal'
 
-export default function Agenda({ sessions, createSession, updateSession, createPago, onSelectSession }) {
+export default function Agenda({ sessions, createSession, updateSession, onSelectSession }) {
   const { config } = useConfig()
   const toast = useToast()
   const confirm = useConfirm()
@@ -49,11 +49,8 @@ export default function Agenda({ sessions, createSession, updateSession, createP
   const openEdit = (session) => setModal({ session })
 
   const handleSessionClick = (ses) => {
-    if (window.matchMedia('(min-width: 769px)').matches) {
-      onSelectSession?.(ses)
-    } else {
-      openEdit(ses)
-    }
+    if (onSelectSession) onSelectSession(ses)
+    else openEdit(ses)
   }
 
   const handleSave = async (form) => {
@@ -93,7 +90,7 @@ export default function Agenda({ sessions, createSession, updateSession, createP
 
     // Daily metrics
     const dayActive   = sessions.filter(s => s.fecha === dateStr && !['Cancelada', 'No show'].includes(s.estatus))
-    const dayAnticipo = dayActive.reduce((a, s) => a + (+s.anticipo || 0), 0)
+    const dayCobrado  = dayActive.reduce((a, s) => a + ingresoAnticipo(s) + (+s.pagos || 0), 0)
     const dayRestante = dayActive.reduce((a, s) => a + (+s.restante || 0), 0)
 
     // Featured: in-session first, then next upcoming today
@@ -132,16 +129,16 @@ export default function Agenda({ sessions, createSession, updateSession, createP
               <div className="dhv2-value">{dayActive.length}</div>
               <div className="dhv2-label">sesiones</div>
             </div>
-            {dayAnticipo > 0 && (
+            {dayCobrado > 0 && (
               <div className="dhv2-item">
-                <div className="dhv2-value green">${dayAnticipo.toLocaleString()}</div>
+                <div className="dhv2-value green">${dayCobrado.toLocaleString()}</div>
                 <div className="dhv2-label">cobrado</div>
               </div>
             )}
             {dayRestante > 0 && (
               <div className="dhv2-item">
                 <div className="dhv2-value amber">${dayRestante.toLocaleString()}</div>
-                <div className="dhv2-label">pendiente</div>
+                <div className="dhv2-label">por cobrar</div>
               </div>
             )}
           </div>
@@ -166,7 +163,7 @@ export default function Agenda({ sessions, createSession, updateSession, createP
             {(+featuredSes.anticipo > 0 || +featuredSes.restante > 0) && (
               <div className="nsc-money">
                 {+featuredSes.anticipo > 0 && (
-                  <span className="nsc-anticipo">${(+featuredSes.anticipo).toLocaleString()} anticipo</span>
+                  <span className="nsc-anticipo">{esCortesia(featuredSes) ? 'Cortesía' : `$${(+featuredSes.anticipo).toLocaleString()} anticipo`}</span>
                 )}
                 {+featuredSes.restante > 0 && (
                   <span className="nsc-restante">${(+featuredSes.restante).toLocaleString()} saldo</span>
@@ -216,7 +213,7 @@ export default function Agenda({ sessions, createSession, updateSession, createP
                       {(+ses.anticipo > 0 || +ses.restante > 0) && (
                         <div className="tl-ses-money">
                           {+ses.anticipo > 0 && (
-                            <span className="tl-anticipo">${(+ses.anticipo).toLocaleString()} ant.</span>
+                            <span className="tl-anticipo">{esCortesia(ses) ? 'Cortesía' : `$${(+ses.anticipo).toLocaleString()} ant.`}</span>
                           )}
                           {+ses.restante > 0 && (
                             <span className="tl-restante">${(+ses.restante).toLocaleString()} saldo</span>
@@ -371,7 +368,6 @@ export default function Agenda({ sessions, createSession, updateSession, createP
           onSave={handleSave}
           onClose={() => setModal(null)}
           onDelete={handleDelete}
-          createPago={createPago}
           sessions={sessions}
         />
       )}

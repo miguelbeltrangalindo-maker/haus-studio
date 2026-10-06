@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { fmtDate, initials } from '../lib/utils'
+import { fmtDate, initials, esCortesia, ingresoAnticipo } from '../lib/utils'
 import Badge from '../components/Badge'
 import { SkeletonRows, EmptyState } from '../components/Skeleton'
 
@@ -28,7 +28,7 @@ export default function Clientes({ sessions = [], loading, onSelectSession }) {
       const activas = c.sesiones.filter(s => !['Cancelada', 'No show'].includes(s.estatus))
       const sorted  = [...c.sesiones].sort((a, b) => b.fecha > a.fecha ? 1 : -1)
       const latest  = sorted[0]
-      const totalGastado = activas.reduce((a, s) => a + (+s.anticipo || 0) + (+s.pagos || 0), 0)
+      const totalGastado = activas.reduce((a, s) => a + ingresoAnticipo(s) + (+s.pagos || 0), 0)
       const saldoPendiente = activas.reduce((a, s) => a + (+s.restante || 0), 0)
       return {
         ...c,
@@ -206,7 +206,7 @@ export default function Clientes({ sessions = [], loading, onSelectSession }) {
                           </div>
                           <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 2 }}>
                             {s.personas} {s.personas === 1 ? 'persona' : 'personas'}
-                            {+s.anticipo > 0 && ` · $${(+s.anticipo).toLocaleString()} ant.`}
+                            {esCortesia(s) ? ' · cortesía' : +s.anticipo > 0 && ` · $${(+s.anticipo).toLocaleString()} ant.`}
                             {+s.pagos > 0 && ` · $${(+s.pagos).toLocaleString()} cobrado`}
                             {+s.restante > 0 && (
                               <span style={{ color: 'var(--amber)' }}>{` · $${(+s.restante).toLocaleString()} saldo`}</span>

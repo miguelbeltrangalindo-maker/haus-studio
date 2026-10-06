@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import { format } from 'date-fns'
 import Sidebar from './components/Sidebar'
@@ -39,6 +39,16 @@ function AppInner() {
   const [selectedId, setSelectedId] = useState(null)
   const [searchOpen, setSearchOpen] = useState(false)
   const location = useLocation()
+
+  // Los wrappers se invocan desde closures viejas (p. ej. "Deshacer" en un toast);
+  // los refs garantizan que siempre lean el estado más reciente.
+  const sessionsRef = useRef(sessions)
+  const pagosRef    = useRef(pagos)
+  const extrasRef   = useRef(extras)
+  sessionsRef.current = sessions
+  pagosRef.current    = pagos
+  extrasRef.current   = extras
+  const findSession = (id) => sessionsRef.current.find(s => s.id === id)
 
   useEffect(() => { setSelectedId(null) }, [location.pathname])
 
@@ -103,6 +113,55 @@ function AppInner() {
     }
   }
 
+  // ── Persona adicional: cargo automático por cada persona arriba de 4 ──────
+  const isPersonaAdicional = (nombre = '') => nombre.toLowerCase().includes('persona adicional')
+
+  // Ajusta el cargo por la diferencia de personas extra (prev → actual) y
+  // refleja ese monto en el saldo por cobrar.
+  const syncPersonaAdicional = async (session, prevPersonas) => {
+    const diff = Math.max(0, (+session.personas || 0) - 4) - Math.max(0, (+prevPersonas || 0) - 4)
+    if (diff === 0) return
+
+    const sessionExtras = extrasRef.current.filter(e => e.session_id === session.id && isPersonaAdicional(e.concepto))
+    let deltaMonto = 0
+
+    if (diff > 0) {
+      const conceptos = config.extra_conceptos || []
+      const concepto = conceptos.find(c => c.nombre.toLowerCase().replace(/\s+/g, ' ').trim() === 'persona adicional')
+        || conceptos.find(c => isPersonaAdicional(c.nombre))
+      if (!concepto) return
+      const precio = +concepto.precio_unitario || 0
+      const last = sessionExtras[sessionExtras.length - 1]
+      const r = last
+        ? await updateExtra(last.id, { cantidad: (+last.cantidad || 1) + diff, monto: (+last.monto || 0) + diff * precio })
+        : await createExtra(session.id, concepto.nombre, diff * precio, diff, precio)
+      if (r?.error) { toast('No se pudo registrar el cargo por persona adicional', 'error'); return }
+      deltaMonto = diff * precio
+    } else {
+      let porQuitar = -diff
+      for (const e of [...sessionExtras].reverse()) {
+        if (porQuitar <= 0) break
+        const qty    = +e.cantidad || 1
+        const precio = (+e.monto || 0) / qty
+        const quita  = Math.min(qty, porQuitar)
+        const r = quita === qty
+          ? await deleteExtra(e.id)
+          : await updateExtra(e.id, { cantidad: qty - quita, monto: (qty - quita) * precio })
+        if (r?.error) { toast('No se pudo ajustar el cargo por persona adicional', 'error'); break }
+        deltaMonto -= quita * precio
+        porQuitar  -= quita
+      }
+    }
+
+    if (deltaMonto !== 0) {
+      const restante = Math.max(0, (+session.restante || 0) + deltaMonto)
+      await updateSession(session.id, { restante: String(restante) })
+      toast(deltaMonto > 0
+        ? `+$${deltaMonto.toLocaleString()} por persona adicional`
+        : `−$${(-deltaMonto).toLocaleString()} por persona adicional`, 'info')
+    }
+  }
+
   // ── Session CRUD with extras + comisión ──────────────────────────────────
   const createSessionWithExtras = async (form) => {
     const result = await createSession(form)
@@ -110,23 +169,7 @@ function AppInner() {
 
     const session = result.data
 
-    // Auto-add "Persona Adicional" extras when personas > 4
-    const extra = (+form.personas || 0) - 4
-    if (extra > 0) {
-      const conceptos = config.extra_conceptos || []
-      const concepto = conceptos.find(c =>
-        c.nombre.toLowerCase().replace(/\s+/g, ' ').trim() === 'persona adicional'
-      ) || conceptos.find(c => c.nombre.toLowerCase().includes('persona adicional'))
-      if (concepto) {
-        const monto = extra * (+concepto.precio_unitario || 0)
-        const er = await createExtra(session.id, concepto.nombre, monto, extra, +concepto.precio_unitario || 0)
-        // El cargo automático también debe sumarse al saldo por cobrar,
-        // igual que los extras agregados manualmente en SessionDetails
-        if (!er?.error && monto > 0) {
-          await updateSession(session.id, { restante: String((+session.restante || 0) + monto) })
-        }
-      }
-    }
+    await syncPersonaAdicional(session, 0)
 
     // Comisión por anticipo con tarjeta
     if (comisionPct > 0 && form.metodo_anticipo === 'tarjeta' && +form.anticipo > 0) {
@@ -148,7 +191,7 @@ function AppInner() {
           body: JSON.stringify({ session_id: session.id }),
         })
         const waData = await waRes.json()
-        if (waData.sent)              toast('WhatsApp enviado al cliente', 'success')
+        if (waData.sent)              { toast('WhatsApp enviado al cliente', 'success'); fetch({ silent: true }) }
         else if (waData.skipped === 'already sent') toast('WhatsApp ya se había enviado', 'info')
         else if (waData.skipped)      toast(`WhatsApp omitido: ${waData.skipped}`, 'info')
         else if (waData.code)         toast(`Error de WhatsApp (${waData.code})`, 'error')
@@ -161,11 +204,15 @@ function AppInner() {
 
   // updateSession wrapper: syncs comisión when anticipo/método cambia
   const updateSessionWithComision = async (id, updates) => {
+    const prev = findSession(id)
     const result = await updateSession(id, updates)
     if (result?.error) return result
 
-    const prev = sessions.find(s => s.id === id)
     const next = { ...prev, ...updates }
+
+    if (updates.personas !== undefined && prev && +updates.personas !== +prev.personas) {
+      await syncPersonaAdicional(result.data, prev.personas)
+    }
 
     // Only re-sync if anticipo-related fields changed
     const antipoChanged =
@@ -182,7 +229,7 @@ function AppInner() {
   // deleteSession wrapper: limpia todos los registros financieros vinculados
   const deleteSessionWithComision = async (id) => {
     // 1. Eliminar comisiones y registros de cada cobro de saldo
-    const sessionPagosToDelete = pagos.filter(p => p.session_id === id)
+    const sessionPagosToDelete = pagosRef.current.filter(p => p.session_id === id)
     for (const pago of sessionPagosToDelete) {
       await deleteComisionByRef(`pago:${pago.id}`)
       await deletePago(pago.id)
@@ -192,7 +239,7 @@ function AppInner() {
     await deleteComisionByRef(`anticipo:${id}`)
 
     // 3. Eliminar cargos adicionales (extras)
-    const sessionExtrasToDelete = extras.filter(e => e.session_id === id)
+    const sessionExtrasToDelete = extrasRef.current.filter(e => e.session_id === id)
     for (const extra of sessionExtrasToDelete) {
       await deleteExtra(extra.id)
     }
@@ -208,7 +255,7 @@ function AppInner() {
     if (result.error) return result
 
     if (comisionPct > 0 && metodo === 'tarjeta' && +monto > 0) {
-      const session = sessions.find(s => s.id === session_id)
+      const session = findSession(session_id)
       const cr = await createComisionGasto(
         `pago:${result.data.id}`,
         comisionMonto(monto),
@@ -228,7 +275,7 @@ function AppInner() {
     const oldMonto  = +oldPago.monto  || 0
     const oldMetodo = oldPago.metodo
 
-    const sess  = sessions.find(s => s.id === oldPago.session_id)
+    const sess  = findSession(oldPago.session_id)
     const delta = newMonto - oldMonto
 
     // El aumento no puede superar el saldo pendiente de la sesión
@@ -247,7 +294,7 @@ function AppInner() {
         restante: String(Math.max(0, (+sess.restante || 0) - delta)),
       }
       // metodo_pago refleja el último cobro real — solo se toca si este pago es el más reciente
-      const sessPagos = pagos.filter(p => p.session_id === oldPago.session_id)
+      const sessPagos = pagosRef.current.filter(p => p.session_id === oldPago.session_id)
       const latest = sessPagos[sessPagos.length - 1]
       if (!latest || latest.id === pagoId) sessionUpdates.metodo_pago = newMetodo
       await updateSession(oldPago.session_id, sessionUpdates)
@@ -261,7 +308,7 @@ function AppInner() {
       } else if (oldMetodo === 'tarjeta' && newMetodo !== 'tarjeta') {
         await deleteComisionByRef(ref)
       } else if (oldMetodo !== 'tarjeta' && newMetodo === 'tarjeta') {
-        const s = sessions.find(s => s.id === oldPago.session_id)
+        const s = findSession(oldPago.session_id)
         await createComisionGasto(ref, comisionMonto(newMonto), comisionConcepto(s?.nombre), todayFecha())
       }
     }
@@ -271,13 +318,13 @@ function AppInner() {
 
   // deletePago wrapper: recalcula sesión y elimina comisión
   const deletePagoWithComision = async (pagoId) => {
-    const pago = pagos.find(p => p.id === pagoId)
+    const pago = pagosRef.current.find(p => p.id === pagoId)
     const result = await deletePago(pagoId)
     if (result?.error) return result
 
     if (pago) {
       // Devolver el monto a restante y descontar de pagos
-      const sess = sessions.find(s => s.id === pago.session_id)
+      const sess = findSession(pago.session_id)
       if (sess) {
         await updateSession(pago.session_id, {
           pagos:    String(Math.max(0, (+sess.pagos    || 0) - (+pago.monto || 0))),
@@ -308,7 +355,7 @@ function AppInner() {
         {loadError && (
           <div className="app-error-banner" role="alert">
             <span>No se pudieron cargar las sesiones — revisa tu conexión.</span>
-            <button className="btn btn-sm" onClick={fetch}>Reintentar</button>
+            <button className="btn btn-sm" onClick={() => fetch()}>Reintentar</button>
           </div>
         )}
         <div className="route-in" key={location.pathname}>

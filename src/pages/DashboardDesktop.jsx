@@ -102,11 +102,11 @@ export default function DashboardDesktop({
           </KpiIcon>
           <div>
             <div className="dash-kpi-value">{confirmadas.length}</div>
-            <div className="dash-kpi-label">Confirmadas</div>
+            <div className="dash-kpi-label">Por atender</div>
           </div>
         </div>
 
-        <div className="dash-kpi" onClick={() => navigate('/sesiones')} style={{ cursor: 'pointer' }}>
+        <div className="dash-kpi" onClick={() => navigate('/sesiones?f=pendiente')} style={{ cursor: 'pointer' }}>
           <KpiIcon color="amber">
             <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
               <circle cx="8" cy="8" r="6.5"/><path d="M8 5v3l2 2"/>
@@ -120,7 +120,7 @@ export default function DashboardDesktop({
           </div>
         </div>
 
-        <div className="dash-kpi" onClick={() => navigate('/sesiones')} style={{ cursor: 'pointer' }}>
+        <div className="dash-kpi" onClick={() => navigate('/sesiones?f=pago')} style={{ cursor: 'pointer' }}>
           <KpiIcon color="amber">
             <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
               <rect x="1.5" y="5.5" width="13" height="8" rx="1.5"/><path d="M5 5.5V4a3 3 0 016 0v1.5"/>
@@ -134,7 +134,7 @@ export default function DashboardDesktop({
           </div>
         </div>
 
-        <div className="dash-kpi">
+        <div className="dash-kpi" onClick={() => navigate('/sesiones?f=pago')} style={{ cursor: 'pointer' }}>
           <KpiIcon color="amber">
             <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
               <circle cx="8" cy="9" r="5.5"/><path d="M8 6.5v2.5l1.5 1.5"/><path d="M5.5 1.5h5M8 1.5v2"/>
@@ -164,7 +164,7 @@ export default function DashboardDesktop({
           </div>
         </div>
 
-        <div className="dash-kpi">
+        <div className="dash-kpi" onClick={() => navigate('/sesiones?f=entregada')} style={{ cursor: 'pointer' }}>
           <KpiIcon color="green">
             <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
               <rect x="2" y="4" width="12" height="9" rx="1.5"/>
@@ -192,7 +192,7 @@ export default function DashboardDesktop({
         </div>
 
         {canceladas.length > 0 && (
-          <div className="dash-kpi">
+          <div className="dash-kpi" onClick={() => navigate('/sesiones?f=cancelada')} style={{ cursor: 'pointer' }}>
             <KpiIcon color="red">
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M4 4l8 8M12 4l-8 8"/>
@@ -226,7 +226,7 @@ export default function DashboardDesktop({
             {(+featuredSession.anticipo > 0 || +featuredSession.restante > 0) && (
               <div className="nsc-money">
                 {+featuredSession.anticipo > 0 && (
-                  <span className="nsc-anticipo">${(+featuredSession.anticipo).toLocaleString()} anticipo</span>
+                  <span className="nsc-anticipo">{featuredSession.metodo_anticipo === 'cupon' ? 'Cortesía' : `$${(+featuredSession.anticipo).toLocaleString()} anticipo`}</span>
                 )}
                 {+featuredSession.restante > 0 && (
                   <span className="nsc-restante">${(+featuredSession.restante).toLocaleString()} saldo</span>
