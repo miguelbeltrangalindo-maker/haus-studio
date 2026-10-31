@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { fmtDate, todayStr, nextStatus, nextStatusLabel, esCortesia, sinFecha, diasEsperando, mensajeApartado } from '../lib/utils'
+import { fmtDate, todayStr, nextStatus, nextStatusLabel, esCortesia, sinFecha, diasEsperando, mensajeApartado, confirmarEntrega } from '../lib/utils'
 import { useConfig } from '../hooks/useConfig'
 import { useToast } from '../hooks/useToast'
 import { useConfirm } from './ConfirmDialog'
@@ -69,6 +69,7 @@ export default function SessionDetails({ session, onClose, updateSession, delete
 
   const handleAdvance = async () => {
     if (!nextSt) return
+    if (!(await confirmarEntrega(confirm, session, nextSt))) return
     setAdvancing(true)
     const prevStatus = session.estatus
     const result = await updateSession(session.id, { estatus: nextSt })

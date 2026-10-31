@@ -105,7 +105,7 @@ export function exportClientes(sessions) {
     const activas  = c.sesiones.filter(s => !['Cancelada', 'No show'].includes(s.estatus))
     const sorted   = [...c.sesiones].sort((a, b) => (b.fecha || '9999') > (a.fecha || '9999') ? 1 : -1)
     const latest   = sorted.find(s => s.fecha) || sorted[0]
-    const totalGastado   = activas.reduce((a, s) => a + ingresoAnticipo(s) + (+s.pagos || 0), 0)
+    const totalGastado   = c.sesiones.filter(s => s.estatus !== 'Cancelada').reduce((a, s) => a + ingresoAnticipo(s) + (+s.pagos || 0), 0)
     const saldoPendiente = activas.reduce((a, s) => a + (+s.restante  || 0), 0)
     return {
       nombre: latest?.nombre || c.nombre,
@@ -253,9 +253,12 @@ export function exportEstadisticas({ sessions, gastos, pagos, extras, rangeStart
     ['Cancelada', 'No show'].includes(s.estatus)
   )
   const rangeGastos = gastos.filter(g => g.fecha >= rangeStart && g.fecha <= rangeEnd)
+  // No show: lo cobrado se queda como ingreso (solo la cancelación lo excluye)
+  const rangeIngreso = sessions.filter(s =>
+    s.fecha >= rangeStart && s.fecha <= rangeEnd && s.estatus !== 'Cancelada')
 
-  const totalAnticipo  = rangeActive.reduce((a, s) => a + ingresoAnticipo(s), 0)
-  const totalPagos     = rangeActive.reduce((a, s) => a + (+s.pagos     || 0), 0)
+  const totalAnticipo  = rangeIngreso.reduce((a, s) => a + ingresoAnticipo(s), 0)
+  const totalPagos     = rangeIngreso.reduce((a, s) => a + (+s.pagos     || 0), 0)
   const totalRestante  = rangeActive.reduce((a, s) => a + (+s.restante  || 0), 0)
   const totalFacturado = totalAnticipo + totalPagos + totalRestante
   const totalCobrado   = totalAnticipo + totalPagos
@@ -264,7 +267,8 @@ export function exportEstadisticas({ sessions, gastos, pagos, extras, rangeStart
   const totalDescuentos = rangeActive.reduce((a, s) => a + (+s.descuento || 0), 0)
 
   const sessionIdsInRange = new Set(rangeActive.map(s => s.id))
-  const rangePagos  = pagos.filter(p => sessionIdsInRange.has(p.session_id))
+  const ingresoIds  = new Set(rangeIngreso.map(s => s.id))
+  const rangePagos  = pagos.filter(p => ingresoIds.has(p.session_id))
   const rangeExtras = extras.filter(e => sessionIdsInRange.has(e.session_id))
   const totalExtras = rangeExtras.reduce((a, e) => a + (+e.monto || 0), 0)
 
@@ -301,8 +305,8 @@ export function exportEstadisticas({ sessions, gastos, pagos, extras, rangeStart
     [],
     ['ANTICIPOS', ''],
     ['Total anticipos',            totalAnticipo],
-    ['Anticipos efectivo',         rangeActive.filter(s => s.metodo_anticipo === 'efectivo').reduce((a, s) => a + (+s.anticipo || 0), 0)],
-    ['Anticipos transferencia',    rangeActive.filter(s => s.metodo_anticipo === 'transferencia').reduce((a, s) => a + (+s.anticipo || 0), 0)],
+    ['Anticipos efectivo',         rangeIngreso.filter(s => s.metodo_anticipo === 'efectivo').reduce((a, s) => a + (+s.anticipo || 0), 0)],
+    ['Anticipos transferencia',    rangeIngreso.filter(s => s.metodo_anticipo === 'transferencia').reduce((a, s) => a + (+s.anticipo || 0), 0)],
     ['Cortesías (sesiones)',       rangeActive.filter(esCortesia).length],
     ['Cortesías (valor regalado)', rangeActive.filter(esCortesia).reduce((a, s) => a + (+s.anticipo || 0), 0)],
   ])
@@ -369,7 +373,7 @@ export function exportEstadisticas({ sessions, gastos, pagos, extras, rangeStart
     acc[key] = (acc[key] || 0) + (+p.monto || 0)
     return acc
   }, {})
-  rangeActive.forEach(s => {
+  rangeIngreso.forEach(s => {
     if (!s.metodo_anticipo || !ingresoAnticipo(s)) return
     metodosMap[s.metodo_anticipo] = (metodosMap[s.metodo_anticipo] || 0) + ingresoAnticipo(s)
   })

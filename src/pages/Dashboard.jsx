@@ -40,7 +40,8 @@ export default function Dashboard(props) {
     (+s.restante === 0 || s.restante === '' || s.restante == null)
   )
   const totalLiquidado = liquidadas.reduce((a, s) => a + ingresoAnticipo(s) + (+s.pagos || 0), 0)
-  const totalAnticipo  = rangeActive.reduce((a, s) => a + ingresoAnticipo(s), 0)
+  // No show: su anticipo se queda como ingreso
+  const totalAnticipo  = rangeSessions.filter(s => s.estatus !== 'Cancelada').reduce((a, s) => a + ingresoAnticipo(s), 0)
   const totalRestante  = rangeActive.reduce((a, s) => a + (+s.restante || 0), 0)
 
   // Apartados sin fecha: foto actual, no dependen del período

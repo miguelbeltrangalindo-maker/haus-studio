@@ -1,10 +1,13 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
 export function useSessions() {
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
+  // updateSession se llama desde closures viejas (toasts "Deshacer"): leer siempre el estado actual
+  const sessionsRef = useRef(sessions)
+  sessionsRef.current = sessions
 
   const fetch = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoading(true)
@@ -41,17 +44,29 @@ export function useSessions() {
       ? 'Para guardar apartados sin fecha falta correr la migración alter_sessions_apartados_sin_fecha.sql en Supabase'
       : msg
 
+  // Choque de horario: otra sesión activa ese día cuya hora cae dentro del mismo bloque
+  // (no solo la misma hora exacta). Se trae la lista del día en vez de maybeSingle, que
+  // devolvía error —y por tanto "sin conflicto"— cuando ya había dos sesiones en el slot.
+  const INACTIVAS = ['Cancelada', 'No show']
+  const toMin = (h) => { const [hh, mm] = String(h).split(':').map(Number); return hh * 60 + (mm || 0) }
+  const findConflict = async (fecha, hora, excludeId = null) => {
+    const { data: block } = await supabase.from('config').select('block_minutes').eq('id', 1).maybeSingle()
+    const blockMin = +block?.block_minutes || 30
+    let q = supabase.from('sessions').select('id, nombre, hora, estatus').eq('fecha', fecha)
+    if (excludeId) q = q.neq('id', excludeId)
+    const { data: delDia, error } = await q
+    if (error) return { error: 'No se pudo verificar la disponibilidad — revisa tu conexión' }
+    const m = toMin(hora)
+    const choque = (delDia || []).find(s =>
+      s.hora && !INACTIVAS.includes(s.estatus) && Math.abs(toMin(s.hora) - m) < blockMin)
+    return choque ? { error: `Ese horario ya está reservado para ${choque.nombre} (${choque.hora.slice(0, 5)})` } : {}
+  }
+
   const createSession = async (data) => {
-    // Check conflict (un apartado sin fecha no ocupa horario)
-    if (data.fecha && data.hora) {
-      const { data: conflict } = await supabase
-        .from('sessions')
-        .select('id, nombre')
-        .eq('fecha', data.fecha)
-        .eq('hora', data.hora)
-        .neq('estatus', 'Cancelada')
-        .maybeSingle()
-      if (conflict) return { error: `Ese horario ya está reservado para ${conflict.nombre}` }
+    // Un apartado sin fecha no ocupa horario
+    if (data.fecha && data.hora && !INACTIVAS.includes(data.estatus)) {
+      const c = await findConflict(data.fecha, data.hora)
+      if (c.error) return c
     }
 
     let payload = { ...data, created_at: new Date().toISOString() }
@@ -65,20 +80,17 @@ export function useSessions() {
   }
 
   const updateSession = async (id, updates) => {
-    // Conflict check when fecha/hora changes
-    if (updates.fecha || updates.hora) {
-      const current = sessions.find(s => s.id === id)
-      const checkFecha = updates.fecha || current?.fecha
-      const checkHora  = updates.hora  || current?.hora
-      const { data: conflict } = !(checkFecha && checkHora) ? {} : await supabase
-        .from('sessions')
-        .select('id, nombre')
-        .eq('fecha', checkFecha)
-        .eq('hora', checkHora)
-        .neq('estatus', 'Cancelada')
-        .neq('id', id)
-        .maybeSingle()
-      if (conflict) return { error: `Ese horario ya está reservado para ${conflict.nombre}` }
+    // Revisar choque si cambia fecha/hora o si una sesión cancelada se reactiva
+    const current = sessionsRef.current.find(s => s.id === id)
+    const nextEstatus = updates.estatus ?? current?.estatus
+    const reactivada = updates.estatus && INACTIVAS.includes(current?.estatus) && !INACTIVAS.includes(updates.estatus)
+    if ((updates.fecha || updates.hora || reactivada) && !INACTIVAS.includes(nextEstatus)) {
+      const checkFecha = 'fecha' in updates ? updates.fecha : current?.fecha
+      const checkHora  = 'hora'  in updates ? updates.hora  : current?.hora
+      if (checkFecha && checkHora) {
+        const c = await findConflict(checkFecha, checkHora, id)
+        if (c.error) return c
+      }
     }
 
     let { data: row, error } = await supabase.from('sessions').update(updates).eq('id', id).select().single()

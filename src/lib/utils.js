@@ -169,3 +169,17 @@ export const resumenApartados = (sessions = []) => {
     tasaAgendado:     cerrados > 0 ? Math.round((agendados.length / cerrados) * 100) : null,
   }
 }
+
+// ── Entrega con saldo pendiente ────────────────────────────────
+// Antes de marcar "Entregada" una sesión que aún debe dinero, se pide confirmación.
+// Devuelve true si se puede continuar.
+export const confirmarEntrega = async (confirm, s, nuevoEstatus, restante = s?.restante) => {
+  if (nuevoEstatus !== 'Entregada' || !(+restante > 0)) return true
+  return confirm({
+    title: 'Entregar con saldo pendiente',
+    message: `${s?.nombre || 'El cliente'} todavía debe $${(+restante).toLocaleString()}.\n\n¿Marcar como entregada de todos modos?`,
+    confirmLabel: 'Entregar de todos modos',
+    cancelLabel: 'No, cobrar primero',
+    destructive: true,
+  })
+}

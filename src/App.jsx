@@ -32,8 +32,8 @@ function AppInner() {
     createGasto, updateGasto, deleteGasto,
     createComisionGasto, updateComisionByRef, deleteComisionByRef,
   } = useGastos()
-  const { pagos, createPago, updatePago, deletePago } = usePagos()
-  const { extras, createExtra, updateExtra, deleteExtra, tableError: extrasTableError } = useExtras()
+  const { pagos, createPago, updatePago, deletePago, fetch: fetchPagos } = usePagos()
+  const { extras, createExtra, updateExtra, deleteExtra, tableError: extrasTableError, fetch: fetchExtras } = useExtras()
   const { config } = useConfig()
   const toast = useToast()
   const [selectedId, setSelectedId] = useState(null)
@@ -51,6 +51,20 @@ function AppInner() {
   const findSession = (id) => sessionsRef.current.find(s => s.id === id)
 
   useEffect(() => { setSelectedId(null) }, [location.pathname])
+
+  // La PWA vive abierta todo el día y no hay tiempo real: al volver a la app tras
+  // un rato en segundo plano se recargan sesiones y cobros (p. ej. hechos desde otro equipo).
+  const refreshRef = useRef(null)
+  refreshRef.current = () => { fetch({ silent: true }); fetchPagos(); fetchExtras() }
+  useEffect(() => {
+    let hiddenAt = 0
+    const onVis = () => {
+      if (document.hidden) { hiddenAt = Date.now(); return }
+      if (hiddenAt && Date.now() - hiddenAt > 30_000) refreshRef.current()
+    }
+    document.addEventListener('visibilitychange', onVis)
+    return () => document.removeEventListener('visibilitychange', onVis)
+  }, [])
 
   // Búsqueda global: ⌘K / Ctrl+K, o "/" fuera de un campo de texto
   useEffect(() => {

@@ -28,7 +28,7 @@ export default function Clientes({ sessions = [], loading, onSelectSession }) {
       const activas = c.sesiones.filter(s => !['Cancelada', 'No show'].includes(s.estatus))
       const sorted  = [...c.sesiones].sort((a, b) => (b.fecha || '9999') > (a.fecha || '9999') ? 1 : -1)
       const latest  = sorted.find(s => s.fecha) || sorted[0]
-      const totalGastado = activas.reduce((a, s) => a + ingresoAnticipo(s) + (+s.pagos || 0), 0)
+      const totalGastado = c.sesiones.filter(s => s.estatus !== 'Cancelada').reduce((a, s) => a + ingresoAnticipo(s) + (+s.pagos || 0), 0)
       const saldoPendiente = activas.reduce((a, s) => a + (+s.restante || 0), 0)
       return {
         ...c,

@@ -1,7 +1,8 @@
-import { useState, useEffect, useMemo } from 'react'
-import { ALL_STATUSES, fmtDate, todayStr, nextStatus, nextStatusLabel } from '../lib/utils'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { ALL_STATUSES, fmtDate, todayStr, nextStatus, nextStatusLabel, confirmarEntrega } from '../lib/utils'
 import { useConfig } from '../hooks/useConfig'
 import { useToast } from '../hooks/useToast'
+import { useConfirm } from './ConfirmDialog'
 import Badge from './Badge'
 
 const ANTICIPO_METHODS = [
@@ -13,6 +14,7 @@ const ANTICIPO_METHODS = [
 export default function SessionModal({ session, startSinFecha = false, prefillDate, prefillHora, onSave, onClose, onDelete, sessions = [] }) {
   const { config } = useConfig()
   const toast = useToast()
+  const confirm = useConfirm()
   const isNew = !session?.id
   const [nameFocused, setNameFocused] = useState(false)
 
@@ -41,7 +43,10 @@ export default function SessionModal({ session, startSinFecha = false, prefillDa
   const [sinFecha, setSinFecha] = useState(session?.id ? !session.fecha : startSinFecha)
 
   // Solo al abrir otra sesión: si el registro cambia mientras se edita, no se pisan los cambios del usuario
+  // Copia de la sesión tal como estaba al abrir: contra ella se calcula qué cambió el usuario
+  const baseRef = useRef(session)
   useEffect(() => {
+    baseRef.current = session
     if (session) setForm(f => ({ ...f, ...session, fecha: session.fecha || f.fecha, hora: session.hora?.slice(0, 5) || f.hora }))
     if (session?.id) setSinFecha(!session.fecha)
   }, [session?.id]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -96,6 +101,15 @@ export default function SessionModal({ session, startSinFecha = false, prefillDa
     const closeTime = (config.close_time || '23:59').slice(0, 5)
     if (reagenda && hora < openTime)   { toast(`La hora no puede ser antes de la apertura (${openTime})`, 'error'); return }
     if (reagenda && hora >= closeTime) { toast(`La última sesión debe empezar antes del cierre (${closeTime})`, 'error'); return }
+    // La hora debe caer en un bloque de la agenda: evita traslapes (10:00 y 10:10) que el
+    // chequeo de conflicto no detecta. El selector de iOS ignora step, por eso se valida aquí.
+    if (reagenda) {
+      const block = +config.block_minutes || 30
+      const toMin = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m }
+      if ((toMin(hora) - toMin(openTime)) % block !== 0) {
+        toast(`La hora debe coincidir con un bloque de ${block} min (ej. ${openTime})`, 'error'); return
+      }
+    }
     if (reagenda) {
       const now = new Date()
       const nowStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
@@ -140,8 +154,28 @@ export default function SessionModal({ session, startSinFecha = false, prefillDa
     if (descDelta !== 0) {
       payload.restante = Math.max(0, (+form.restante || 0) - descDelta)
     }
+    // Reagendar a otro día: el recordatorio enviado era para la fecha anterior,
+    // así el cron vuelve a avisar para la nueva.
+    if (!isNew && baseRef.current?.fecha && payload.fecha && payload.fecha !== baseRef.current.fecha) {
+      payload.reminder_sent = false
+    }
+    let toSave = payload
+    if (!isNew) {
+      // Solo se envía lo que el usuario cambió: si mientras tanto se registró un cobro
+      // (otro dispositivo, otra pestaña), no se pisan restante/pagos con valores viejos.
+      const norm = (v) => (v == null ? '' : String(v))
+      const base = baseRef.current || {}
+      toSave = {}
+      Object.keys(payload).forEach(k => {
+        if (k === 'id' || k === 'created_at') return
+        if (norm(payload[k]) !== norm(k === 'hora' ? base.hora?.slice(0, 5) : base[k])) toSave[k] = payload[k]
+      })
+      if (!Object.keys(toSave).length) { onClose(); return }
+    }
+    if (toSave.estatus === 'Entregada' &&
+        !(await confirmarEntrega(confirm, { ...form, nombre: payload.nombre }, 'Entregada', payload.restante))) return
     setSaving(true)
-    await onSave(payload)
+    await onSave(toSave)
     setSaving(false)
   }
 

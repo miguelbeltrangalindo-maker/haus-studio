@@ -25,8 +25,13 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
   const rangeSessions = sessions.filter(s => s.fecha >= effectiveStart && s.fecha <= effectiveEnd)
   const rangeActive   = rangeSessions.filter(s => !['Cancelada', 'No show'].includes(s.estatus))
   const canceladas    = rangeSessions.filter(s => ['Cancelada', 'No show'].includes(s.estatus))
+  // No show: el anticipo (y cualquier cobro) se queda como ingreso; su saldo ya no se cobra.
+  // Solo una cancelación deja fuera el dinero.
+  const rangeIngreso  = rangeSessions.filter(s => s.estatus !== 'Cancelada')
+  const ingresoSes    = (s) => ingresoAnticipo(s) + (+s.pagos || 0)
+  const ingresoNoShow = rangeSessions.filter(s => s.estatus === 'No show').reduce((a, s) => a + ingresoSes(s), 0)
 
-  const totalAnticipo  = rangeActive.reduce((a, s) => a + ingresoAnticipo(s), 0)
+  const totalAnticipo  = rangeIngreso.reduce((a, s) => a + ingresoAnticipo(s), 0)
   const totalRestante  = rangeActive.reduce((a, s) => a + (+s.restante  || 0), 0)
 
   const totalDescuentos = rangeActive.reduce((a, s) => a + (+s.descuento || 0), 0)
@@ -40,7 +45,7 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
   // Valor real por sesión = anticipo + pagos cobrados + saldo pendiente (descuentos ya aplicados al restante).
   // Las cortesías no se facturan; solo sus cargos extra (si los hay) llegan vía pagos/restante.
   const totalFacturado = rangeActive.reduce((a, s) =>
-    a + ingresoAnticipo(s) + (+s.pagos || 0) + (+s.restante || 0), 0)
+    a + ingresoAnticipo(s) + (+s.pagos || 0) + (+s.restante || 0), 0) + ingresoNoShow
 
   const liquidadas = rangeActive.filter(s =>
     ['Completada', 'Entregada', 'Pendiente de entrega'].includes(s.estatus) &&
@@ -49,8 +54,7 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
   const totalLiquidado = liquidadas.reduce((a, s) => a + ingresoAnticipo(s) + (+s.pagos || 0), 0)
 
   // Cobrado real: anticipos + pagos cobrados del saldo (sin cortesías)
-  const totalCobrado = rangeActive.reduce((a, s) =>
-    a + ingresoAnticipo(s) + (+s.pagos || 0), 0)
+  const totalCobrado = rangeIngreso.reduce((a, s) => a + ingresoSes(s), 0)
 
   const conDeuda = rangeActive.filter(s => +s.restante > 0)
   const pctCobrado = totalFacturado > 0 ? Math.round((totalCobrado / totalFacturado) * 100) : 0
@@ -90,14 +94,15 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
   const apartados = resumenApartados(sessions)
 
   // ── Anticipos por método ──
-  const anticipoEfectivo      = rangeActive.filter(s => s.metodo_anticipo === 'efectivo').reduce((a, s) => a + (+s.anticipo || 0), 0)
-  const anticipoTransferencia = rangeActive.filter(s => s.metodo_anticipo === 'transferencia').reduce((a, s) => a + (+s.anticipo || 0), 0)
-  const anticipoSinMetodo     = rangeActive.filter(s => !s.metodo_anticipo && +s.anticipo > 0).reduce((a, s) => a + (+s.anticipo || 0), 0)
+  const anticipoEfectivo      = rangeIngreso.filter(s => s.metodo_anticipo === 'efectivo').reduce((a, s) => a + (+s.anticipo || 0), 0)
+  const anticipoTransferencia = rangeIngreso.filter(s => s.metodo_anticipo === 'transferencia').reduce((a, s) => a + (+s.anticipo || 0), 0)
+  const anticipoSinMetodo     = rangeIngreso.filter(s => !s.metodo_anticipo && +s.anticipo > 0).reduce((a, s) => a + (+s.anticipo || 0), 0)
   const maxAnticipo = Math.max(anticipoEfectivo, anticipoTransferencia, anticipoSinMetodo, 1)
 
   // ── Cobros por método (session_pagos + anticipos) ──
   const sessionIdsInRange = new Set(rangeActive.map(s => s.id))
-  const rangePagos = pagos.filter(p => sessionIdsInRange.has(p.session_id))
+  const ingresoIds = new Set(rangeIngreso.map(s => s.id))
+  const rangePagos = pagos.filter(p => ingresoIds.has(p.session_id))
   // Start with pagos del saldo (session_pagos)
   const metodosMap = rangePagos.reduce((acc, p) => {
     const key = p.metodo || 'efectivo'
@@ -105,7 +110,7 @@ export default function Estadisticas({ sessions, gastos = [], pagos = [], extras
     return acc
   }, {})
   // Add anticipos by their method
-  rangeActive.forEach(s => {
+  rangeIngreso.forEach(s => {
     if (!s.metodo_anticipo || !ingresoAnticipo(s)) return
     metodosMap[s.metodo_anticipo] = (metodosMap[s.metodo_anticipo] || 0) + ingresoAnticipo(s)
   })

@@ -42,8 +42,18 @@ export default function Agenda({ sessions, createSession, updateSession, onSelec
     return format(current, "MMMM yyyy", { locale: es })
   }
 
-  const getSessionsAt = (dateStr, hora) =>
-    sessions.filter(s => s.fecha === dateStr && s.hora?.slice(0, 5) === hora && s.estatus !== 'Cancelada')
+  // Una sesión cae en el bloque que la contiene (no solo si coincide exacto): una hora
+  // fuera de la cuadrícula (10:15) o un cambio de block_minutes no la vuelve invisible.
+  const blockMin = config.block_minutes || 30
+  const toMin = (h) => { const [hh, mm] = (h || '').split(':').map(Number); return hh * 60 + (mm || 0) }
+  const getSessionsAt = (dateStr, slot) => {
+    const start = toMin(slot)
+    return sessions.filter(s => {
+      if (s.fecha !== dateStr || !s.hora || s.estatus === 'Cancelada') return false
+      const m = toMin(s.hora)
+      return m >= start && m < start + blockMin
+    })
+  }
 
   const openNew = (date, hora) => setModal({ prefillDate: date, prefillHora: hora })
   const openEdit = (session) => setModal({ session })
@@ -90,7 +100,9 @@ export default function Agenda({ sessions, createSession, updateSession, onSelec
 
     // Daily metrics
     const dayActive   = sessions.filter(s => s.fecha === dateStr && !['Cancelada', 'No show'].includes(s.estatus))
-    const dayCobrado  = dayActive.reduce((a, s) => a + ingresoAnticipo(s) + (+s.pagos || 0), 0)
+    // No show: su anticipo sí es ingreso del día
+    const dayCobrado  = sessions.filter(s => s.fecha === dateStr && s.estatus !== 'Cancelada')
+      .reduce((a, s) => a + ingresoAnticipo(s) + (+s.pagos || 0), 0)
     const dayRestante = dayActive.reduce((a, s) => a + (+s.restante || 0), 0)
 
     // Featured: in-session first, then next upcoming today

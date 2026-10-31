@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { esCortesia, ingresoAnticipo, todayStr, fmtDate, initials, statusClass, nextStatus, nextStatusLabel } from '../lib/utils'
+import { esCortesia, ingresoAnticipo, todayStr, fmtDate, initials, statusClass, nextStatus, nextStatusLabel, confirmarEntrega } from '../lib/utils'
 import { SkeletonRows } from '../components/Skeleton'
 
 const QUICK_FLOW = [
@@ -67,16 +67,18 @@ export default function Hoy({ sessions, loading, fetch: refresh, createSession, 
     .filter(s => s.fecha === today && s.estatus !== 'Cancelada')
     .sort((a, b) => (a.hora || '') > (b.hora || '') ? 1 : -1)
 
-  // "No show" se muestra en la lista pero no cuenta en las métricas del día
+  // "No show" se muestra en la lista y no cuenta como sesión ni como por cobrar,
+  // pero su anticipo sí es ingreso del día
   const todayActivas = todaySessions.filter(s => s.estatus !== 'No show')
   const completadas  = todayActivas.filter(s => ['Completada', 'Entregada', 'Pendiente de entrega'].includes(s.estatus)).length
   const pendientes   = todayActivas.filter(s => ['Reservada', 'Confirmada', 'Llegó', 'En sesión'].includes(s.estatus)).length
-  const cobrado      = todayActivas.reduce((a, s) => a + ingresoAnticipo(s) + (+s.pagos || 0), 0)
+  const cobrado      = todaySessions.reduce((a, s) => a + ingresoAnticipo(s) + (+s.pagos || 0), 0)
   const porCobrar    = todayActivas.reduce((a, s) => a + (+s.restante || 0), 0)
 
   const dateLabel = format(new Date(), "EEEE, d 'de' MMMM yyyy", { locale: es })
 
   const handleQuick = async (session, newStatus) => {
+    if (!(await confirmarEntrega(confirm, session, newStatus))) return
     const prevStatus = session.estatus
     const result = await updateSession(session.id, { estatus: newStatus })
     if (result.error) { toast(result.error, 'error'); return }
