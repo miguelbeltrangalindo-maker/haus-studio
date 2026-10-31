@@ -23,6 +23,7 @@ const getQuickActions = (estatus) => {
 import { useConfig } from '../hooks/useConfig'
 import { useNowMinutes } from '../hooks/useNowMinutes'
 import { useToast } from '../hooks/useToast'
+import { useAuth } from '../hooks/useAuth'
 import { useConfirm } from '../components/ConfirmDialog'
 import Badge from '../components/Badge'
 import SessionModal from '../components/SessionModal'
@@ -37,15 +38,15 @@ export default function Hoy({ sessions, loading, fetch: refresh, createSession, 
   const [cobrarSession, setCobrarSession] = useState(null)
   const [corteOpen, setCorteOpen] = useState(false)
   const [sendingWA, setSendingWA] = useState(new Set())
+  const { authFetch } = useAuth()
 
   const sendTemplate = async (s, e) => {
     e.stopPropagation()
     if (!s.telefono) { toast('Sin número de teléfono', 'error'); return }
     setSendingWA(prev => new Set(prev).add(s.id))
     try {
-      const res  = await fetch('/api/send-confirmation', {
+      const res  = await authFetch('/api/send-confirmation', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: s.id }),
       })
       const data = await res.json()

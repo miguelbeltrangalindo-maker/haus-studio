@@ -3,6 +3,7 @@ import { format, addDays } from 'date-fns'
 import { useConfig } from '../hooks/useConfig'
 import { useToast } from '../hooks/useToast'
 import { supabase } from '../lib/supabase'
+import { CuentaCard, UsuariosSection } from './Cuenta'
 
 const Toggle = ({ checked, onChange }) => (
   <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', flexShrink: 0 }}
@@ -159,6 +160,9 @@ export default function Config({ comisionSchemaReady = false }) {
 
       <div className="page-content">
         <div style={{ maxWidth: 640 }}>
+
+          <CuentaCard />
+          <UsuariosSection />
 
           <div className="config-section">
             <div className="config-title">Estudio</div>

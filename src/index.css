@@ -2086,3 +2086,46 @@ select.form-input option { background: var(--bg3); color: var(--text); }
 .dp-sinfecha-sub { font-size: 12px; color: var(--text3); margin-top: 4px; }
 .apartados-dias { font-size: 12px; color: var(--text3); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .apartados-dias.viejo { color: var(--amber-l); }
+
+/* ─── Login ─────────────────────────────────────────────────── */
+.login-wrap {
+  min-height: 100vh; min-height: 100dvh;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px 16px;
+}
+.login-card {
+  width: 100%; max-width: 380px;
+  padding: 36px 28px 30px;
+  background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.015)), var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-2), var(--card-edge);
+  display: flex; flex-direction: column;
+  animation: login-in .32s var(--ease-out) both;
+}
+@keyframes login-in {
+  from { opacity: 0; transform: translateY(8px) scale(.98); }
+  to   { opacity: 1; transform: none; }
+}
+.login-error {
+  font-size: 13px; color: var(--red-l);
+  background: rgba(248,113,113,.1); border: 1px solid rgba(248,113,113,.35);
+  border-radius: var(--r3); padding: 8px 12px;
+}
+@media (prefers-reduced-motion: reduce) { .login-card { animation: none; } }
+
+/* ─── Usuarios (Configuración) ──────────────────────────────── */
+.user-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 0; border-bottom: 1px solid var(--border);
+}
+.user-row:last-child { border-bottom: none; }
+.user-row-info { flex: 1; min-width: 0; }
+.user-row-name { font-size: 14px; font-weight: 500; }
+.user-row-meta { font-size: 12px; color: var(--text3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.role-pill {
+  font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  padding: 2px 8px; border-radius: 99px; border: 1px solid var(--border);
+  color: var(--text2);
+}
+.role-pill.admin { color: var(--violet-l); border-color: rgba(139,92,246,.4); background: rgba(139,92,246,.1); }

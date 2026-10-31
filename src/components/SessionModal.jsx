@@ -3,6 +3,7 @@ import { ALL_STATUSES, fmtDate, todayStr, nextStatus, nextStatusLabel, confirmar
 import { useConfig } from '../hooks/useConfig'
 import { useToast } from '../hooks/useToast'
 import { useConfirm } from './ConfirmDialog'
+import { useAuth } from '../hooks/useAuth'
 import Badge from './Badge'
 
 const ANTICIPO_METHODS = [
@@ -15,6 +16,7 @@ export default function SessionModal({ session, startSinFecha = false, prefillDa
   const { config } = useConfig()
   const toast = useToast()
   const confirm = useConfirm()
+  const { isAdmin } = useAuth()
   const isNew = !session?.id
   const [nameFocused, setNameFocused] = useState(false)
 
@@ -327,8 +329,8 @@ export default function SessionModal({ session, startSinFecha = false, prefillDa
               onChange={e => set('restante', e.target.value)} placeholder="0" />
           </div>
           <div className="form-group">
-            <label className="form-label">Descuento ($)</label>
-            <input className="form-input" type="number" inputMode="decimal" min="0"
+            <label className="form-label">Descuento ($){!isAdmin && <span style={{ fontWeight: 400, color: 'var(--text3)', fontSize: 11 }}> · solo administrador</span>}</label>
+            <input className="form-input" type="number" inputMode="decimal" min="0" disabled={!isAdmin}
               value={form.descuento || ''}
               onChange={e => {
                 const desc = +e.target.value || 0

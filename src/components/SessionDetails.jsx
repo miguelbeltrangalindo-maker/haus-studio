@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { fmtDate, todayStr, nextStatus, nextStatusLabel, esCortesia, sinFecha, diasEsperando, mensajeApartado, confirmarEntrega } from '../lib/utils'
 import { useConfig } from '../hooks/useConfig'
 import { useToast } from '../hooks/useToast'
+import { useAuth } from '../hooks/useAuth'
 import { useConfirm } from './ConfirmDialog'
 import Badge from './Badge'
 import SessionModal from './SessionModal'
@@ -18,6 +19,8 @@ export default function SessionDetails({ session, onClose, updateSession, delete
   const { config } = useConfig()
   const toast = useToast()
   const confirm = useConfirm()
+  // Operador: no edita/borra cobros ni aplica/quita descuentos (la base de datos también lo impide)
+  const { isAdmin } = useAuth()
   const [editOpen, setEditOpen]   = useState(false)
   const [advancing, setAdvancing] = useState(false)
   const [syncing, setSyncing]     = useState(false)
@@ -106,7 +109,8 @@ export default function SessionDetails({ session, onClose, updateSession, delete
       action: {
         label: 'Deshacer',
         onClick: async () => {
-          await deletePago(pagoId)          // restaura pagos/restante y elimina la comisión
+          const r = await deletePago(pagoId) // restaura pagos/restante y elimina la comisión
+          if (r?.error) { toast(r.error, 'error'); return }
           return updateSession(session.id, { estatus: prev.estatus, metodo_pago: prev.metodo_pago || null })
         },
       },
@@ -454,7 +458,7 @@ export default function SessionDetails({ session, onClose, updateSession, delete
         )}
 
         {/* Descuento */}
-        {(hasPending || +session.descuento > 0) && (
+        {((hasPending && isAdmin) || +session.descuento > 0) && (
           <div className="dp-section">
             <div className="dp-section-label">Descuento</div>
             {+session.descuento > 0 && (
@@ -464,15 +468,15 @@ export default function SessionDetails({ session, onClose, updateSession, delete
                   <span className="dp-meta-value" style={{ color: 'var(--green-l)' }}>
                     −${(+session.descuento).toLocaleString()}
                   </span>
-                  <button
+                  {isAdmin && <button
                     onClick={handleRevertDescuento}
                     title="Quitar descuento (restaura el saldo)"
                     style={{ background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0 }}
-                  >×</button>
+                  >×</button>}
                 </span>
               </div>
             )}
-            {hasPending && (
+            {hasPending && isAdmin && (
             <div style={{ display: 'flex', gap: 8 }}>
               <input
                 className="form-input"
@@ -619,7 +623,7 @@ export default function SessionDetails({ session, onClose, updateSession, delete
                       <span className="dp-meta-value" style={{ color: 'var(--green-l)', fontWeight: 600 }}>
                         ${(+p.monto).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                       </span>
-                      {updatePago && (
+                      {updatePago && isAdmin && (
                         <button
                           onClick={() => startEditPago(p)}
                           title="Editar pago"
@@ -630,7 +634,7 @@ export default function SessionDetails({ session, onClose, updateSession, delete
                           </svg>
                         </button>
                       )}
-                      {deletePago && (
+                      {deletePago && isAdmin && (
                         <button
                           onClick={() => handleDeletePago(p)}
                           title="Eliminar pago"

@@ -14,6 +14,9 @@ import GlobalSearch from './components/GlobalSearch'
 import { ToastProvider, useToast } from './hooks/useToast'
 import { ConfigProvider, useConfig } from './hooks/useConfig'
 import { ConfirmProvider } from './components/ConfirmDialog'
+import { AuthProvider, useAuth } from './hooks/useAuth'
+import { AuthGate } from './pages/Login'
+import Cuenta from './pages/Cuenta'
 import { useSessions } from './hooks/useSessions'
 import { useGastos } from './hooks/useGastos'
 import { usePagos } from './hooks/usePagos'
@@ -35,6 +38,7 @@ function AppInner() {
   const { pagos, createPago, updatePago, deletePago, fetch: fetchPagos } = usePagos()
   const { extras, createExtra, updateExtra, deleteExtra, tableError: extrasTableError, fetch: fetchExtras } = useExtras()
   const { config } = useConfig()
+  const { isAdmin, authFetch } = useAuth()
   const toast = useToast()
   const [selectedId, setSelectedId] = useState(null)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -206,9 +210,8 @@ function AppInner() {
   const sendBookingConfirmation = async (session) => {
     if (config.wa_settings?.on_booking && session?.id) {
       try {
-        const waRes  = await window.fetch('/api/send-confirmation', {
+        const waRes  = await authFetch('/api/send-confirmation', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ session_id: session.id }),
         })
         const waData = await waRes.json()
@@ -401,7 +404,7 @@ function AppInner() {
               <Estadisticas sessions={sessions} gastos={gastos} pagos={pagos} extras={extras} extrasTableError={extrasTableError} onSelectSession={onSelectSession} />
             </Suspense>
           } />
-          <Route path="/config"       element={<Config comisionSchemaReady={comisionSchemaReady} />} />
+          <Route path="/config"       element={isAdmin ? <Config comisionSchemaReady={comisionSchemaReady} /> : <Cuenta />} />
         </Routes>
         </div>
       </main>
@@ -440,9 +443,13 @@ export default function App() {
   return (
     <ToastProvider>
       <ConfirmProvider>
-        <ConfigProvider>
-          <AppInner />
-        </ConfigProvider>
+        <AuthProvider>
+          <AuthGate>
+            <ConfigProvider>
+              <AppInner />
+            </ConfigProvider>
+          </AuthGate>
+        </AuthProvider>
       </ConfirmProvider>
     </ToastProvider>
   )

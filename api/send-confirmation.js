@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { adminClient, requireStaff } from './_auth.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -8,10 +8,10 @@ export default async function handler(req, res) {
   const { session_id } = req.body || {}
   if (!session_id) return res.status(400).json({ error: 'session_id required' })
 
-  const supabase = createClient(
-    process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
-  )
+  const supabase = adminClient()
+  // Solo usuarios del estudio con sesión iniciada pueden disparar mensajes
+  const auth = await requireStaff(req, supabase)
+  if (auth.error) return res.status(auth.status).json({ error: auth.error })
 
   // confirmation_sent separa la confirmación del recordatorio programado; sin la
   // columna (migración pendiente) se usa reminder_sent como antes.

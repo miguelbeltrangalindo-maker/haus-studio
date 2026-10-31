@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { useAuth } from '../hooks/useAuth'
 
 const IconGrid = () => (
   <svg className="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -62,6 +63,7 @@ const IconSearch = () => (
 const navLink = ({ isActive }) => `nav-item ${isActive ? 'active' : ''}`
 
 export default function Sidebar({ onSearch }) {
+  const { isAdmin, profile, signOut } = useAuth()
   return (
     <aside className="sidebar">
       <div className="logo">
@@ -96,12 +98,19 @@ export default function Sidebar({ onSearch }) {
           <IconChart /><span>Estadísticas</span>
         </NavLink>
         <NavLink to="/config" className={navLink}>
-          <IconCog /><span>Configuración</span>
+          <IconCog /><span>{isAdmin ? 'Configuración' : 'Mi cuenta'}</span>
         </NavLink>
       </nav>
 
       <div className="sidebar-bottom">
-        <div style={{ fontSize: 11, color: 'var(--text3)', padding: '2px 14px' }}>HAUS Studio v1.3</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '2px 14px 10px' }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile?.nombre}</div>
+            <div style={{ fontSize: 11, color: 'var(--text3)' }}>{isAdmin ? 'Administrador' : 'Operador'}</div>
+          </div>
+          <button type="button" className="btn btn-ghost btn-xs" onClick={signOut}>Salir</button>
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--text3)', padding: '2px 14px' }}>HAUS Studio v1.4</div>
       </div>
     </aside>
   )

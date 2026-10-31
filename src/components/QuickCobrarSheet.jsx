@@ -58,7 +58,8 @@ export default function QuickCobrarSheet({ session, onClose, updateSession, crea
       action: {
         label: 'Deshacer',
         onClick: async () => {
-          await deletePago(pagoId)          // restaura pagos/restante y elimina la comisión
+          const r = await deletePago(pagoId) // restaura pagos/restante y elimina la comisión
+          if (r?.error) { toast(r.error, 'error'); return }
           return updateSession(session.id, { estatus: prev.estatus, metodo_pago: prev.metodo_pago || null })
         },
       },
