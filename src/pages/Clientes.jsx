@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { fmtDate, initials, esCortesia, ingresoAnticipo, fmtFechaHora } from '../lib/utils'
+import { fmtDate, initials, esCortesia, ingresoAnticipo, fmtFechaHora, clienteKey } from '../lib/utils'
 import Badge from '../components/Badge'
 import { SkeletonRows, EmptyState } from '../components/Skeleton'
 
@@ -11,7 +11,7 @@ export default function Clientes({ sessions = [], loading, onSelectSession }) {
   const clientes = useMemo(() => {
     const map = {}
     sessions.forEach(s => {
-      const phone = s.telefono?.replace(/\D/g, '').slice(-10) || 'sin-telefono'
+      const phone = clienteKey(s)
       if (!map[phone]) {
         map[phone] = {
           phone,

@@ -26,6 +26,15 @@ export const tomorrowStr = () => {
   return format(d, 'yyyy-MM-dd')
 }
 
+// Llave de cliente: teléfono (10 dígitos) o, si no hay, el nombre normalizado.
+// Sin esto, todas las sesiones sin teléfono se juntaban en un solo "cliente".
+export const clienteKey = (s) => {
+  const tel = (s?.telefono || '').replace(/\D/g, '').slice(-10)
+  if (tel.length === 10) return tel
+  const nombre = (s?.nombre || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim()
+  return nombre ? `nombre:${nombre}` : 'sin-telefono'
+}
+
 export const initials = (name) =>
   (name || '').split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() || '').join('')
 

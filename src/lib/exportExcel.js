@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { esCortesia, ingresoAnticipo, resumenApartados, diasEsperando } from './utils'
+import { esCortesia, ingresoAnticipo, resumenApartados, diasEsperando, clienteKey } from './utils'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 const today = () => format(new Date(), 'yyyy-MM-dd')
@@ -96,7 +96,7 @@ export function exportClientes(sessions) {
   // Build client map (same logic as Clientes.jsx)
   const map = {}
   sessions.forEach(s => {
-    const phone = s.telefono?.replace(/\D/g, '').slice(-10) || 'sin-telefono'
+    const phone = clienteKey(s)
     if (!map[phone]) map[phone] = { phone, nombre: s.nombre, telefono: s.telefono, sesiones: [] }
     map[phone].sesiones.push(s)
   })
