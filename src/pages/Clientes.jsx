@@ -2,8 +2,42 @@ import { useMemo, useState } from 'react'
 import { fmtDate, initials, esCortesia, ingresoAnticipo, fmtFechaHora, clienteKey } from '../lib/utils'
 import Badge from '../components/Badge'
 import { SkeletonRows, EmptyState } from '../components/Skeleton'
+import { useToast } from '../hooks/useToast'
 
-export default function Clientes({ sessions = [], loading, onSelectSession }) {
+const tieneTel = (c) => /^\d{10}$/.test(c.phone)
+
+// Captura rápida del teléfono de una clienta: se guarda en todas sus sesiones
+function TelefonoForm({ cliente, updateSession }) {
+  const toast = useToast()
+  const [tel, setTel]   = useState('')
+  const [busy, setBusy] = useState(false)
+  const guardar = async () => {
+    if (tel.length !== 10) { toast('El teléfono debe tener 10 dígitos', 'error'); return }
+    setBusy(true)
+    let fallos = 0
+    for (const s of cliente.sesiones) {
+      const r = await updateSession(s.id, { telefono: tel })
+      if (r?.error) fallos++
+    }
+    setBusy(false)
+    if (fallos) toast(`No se pudo guardar en ${fallos} sesión${fallos !== 1 ? 'es' : ''}`, 'error')
+    else toast(`Teléfono guardado para ${cliente.nombre}`, 'success')
+  }
+  return (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '12px 20px', borderBottom: '1px solid var(--border)' }}
+      onClick={e => e.stopPropagation()}>
+      <input className="form-input" inputMode="numeric" autoFocus placeholder="Teléfono (10 dígitos)"
+        value={tel} onChange={e => setTel(e.target.value.replace(/\D/g, '').slice(0, 10))}
+        onKeyDown={e => e.key === 'Enter' && guardar()}
+        style={{ flex: 1, ...(tel.length > 0 && tel.length !== 10 ? { borderColor: 'var(--red)' } : {}) }} />
+      <button className="btn btn-primary btn-sm" onClick={guardar} disabled={busy || tel.length !== 10}>
+        {busy ? 'Guardando…' : 'Guardar'}
+      </button>
+    </div>
+  )
+}
+
+export default function Clientes({ sessions = [], loading, onSelectSession, updateSession }) {
   const [search, setSearch]     = useState('')
   const [expanded, setExpanded] = useState(null)
   const [sort, setSort]         = useState('reciente') // reciente | sesiones | gasto
@@ -150,7 +184,7 @@ export default function Clientes({ sessions = [], loading, onSelectSession }) {
                         )}
                       </div>
                       <div className="session-card-meta">
-                        {c.telefono}
+                        {tieneTel(c) ? c.telefono : <span style={{ color: 'var(--amber-l)' }}>Sin teléfono</span>}
                         {c.ultimaVisita && ` · Última visita: ${fmtDate(c.ultimaVisita)}`}
                       </div>
                       <div className="session-card-money">
@@ -190,6 +224,7 @@ export default function Clientes({ sessions = [], loading, onSelectSession }) {
                 {/* Expanded sessions */}
                 {expanded === c.phone && (
                   <div style={{ borderTop: '1px solid var(--border)', background: 'var(--bg2)' }}>
+                    {!tieneTel(c) && updateSession && <TelefonoForm cliente={c} updateSession={updateSession} />}
                     {c.sesiones.map(s => (
                       <div
                         key={s.id}

@@ -391,7 +391,7 @@ function AppInner() {
           <Route path="/hoy"          element={<Hoy          {...shared} pagos={pagos} gastos={gastos} />} />
           <Route path="/agenda"       element={<Agenda       {...shared} />} />
           <Route path="/sesiones"     element={<Sesiones     {...shared} />} />
-          <Route path="/clientes"     element={<Clientes sessions={sessions} loading={loading} onSelectSession={onSelectSession} />} />
+          <Route path="/clientes"     element={<Clientes sessions={sessions} loading={loading} onSelectSession={onSelectSession} updateSession={updateSessionWithComision} />} />
           <Route path="/gastos"       element={
             <Gastos
               gastos={gastos} loading={gastosLoading} tableError={tableError}
